@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import './Compose.css';
 import { Button } from 'react-bootstrap';
 
-import firebase from '../../firebase';
-import 'firebase/firestore';
-
-const db = firebase.firestore();
-const messagesRef = db.collection('messages');
+import {database, app} from '../../firebase';
+const messagesRef = database.collection('messages');
 
 export default function Compose(props) {
   const [message, setMessage] = useState('')
@@ -14,7 +11,7 @@ export default function Compose(props) {
     e.preventDefault();
     messagesRef.add({
       text: message,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: app.firestore.FieldValue.serverTimestamp(),
     })
   }
   return (

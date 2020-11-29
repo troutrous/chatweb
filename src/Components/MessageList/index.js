@@ -4,14 +4,13 @@ import Compose from '../Compose';
 import ToolbarButton from '../ToolbarButton';
 import Message from '../Message';
 import moment from 'moment';
-import firebase from '../../firebase';
+import {database} from '../../firebase';
 import 'firebase/firestore';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 import './MessageList.css';
 
-const db = firebase.firestore();
-const messagesRef = db.collection('messages');
+const messagesRef = database.collection('messages');
 
 export default function MessageList(props) {
   
