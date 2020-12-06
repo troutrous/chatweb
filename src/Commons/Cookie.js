@@ -7,7 +7,7 @@ export const setCookie = (cname, cvalue) => {
 
 export const getCookie = (cname) => {
     const cookieValue = document.cookie
-        .split(';')
+        .split('; ')
         .find(row => row.startsWith(cname));
     return cookieValue ? cookieValue.split('=')[1] : null;
 }

@@ -6,6 +6,7 @@ import {
 
 import Sign from './Pages/Sign';
 import Room from './Pages/Room';
+import Profile from './Pages/Profile';
 
 function App() {
   return (
@@ -13,6 +14,9 @@ function App() {
         <Switch>
           <Route path="/sign">
             <Sign />
+          </Route>
+          <Route path="/profile">
+            <Profile />
           </Route>
           <Route path="/room">
             <Room />

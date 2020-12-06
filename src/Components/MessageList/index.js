@@ -6,17 +6,13 @@ import Message from '../Message';
 import moment from 'moment';
 import {database} from '../../firebase';
 import 'firebase/firestore';
-import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 import './MessageList.css';
 
-const messagesRef = database.collection('messages');
-
 export default function MessageList(props) {
-  
-  const query = messagesRef.orderBy('createdAt').limit(25);
-  const [messages] = useCollectionData(query, { idField: 'id' });
-
+  const {messages} = props;
+  const {handleAddMessage} = props;
+  const {user} = props;
   return (
     <div className="message-list h-100 w-100">
 
@@ -24,12 +20,12 @@ export default function MessageList(props) {
         {
           messages && messages.map(message => {
             return (
-              <Message key={message.id} message={message} />
+              <Message key={message.id} message={message} user={user}/>
             )
           })
         }
       </div>
-      <Compose/>
+      <Compose handleAddMessage={handleAddMessage}/>
     </div>
   );
 }

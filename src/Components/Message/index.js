@@ -4,16 +4,12 @@ import './Message.css';
 
 export default function Message(props) {
   const { message } = props;
-
   const isMine = true;
-  const startsSequence = false;
-  const endsSequence = false;
+  const {user} = props;
   return (
     <div className={[
       'message',
-      `${isMine ? 'mine' : ''}`,
-      `${startsSequence ? 'start' : ''}`,
-      `${endsSequence ? 'end' : ''}`
+      `${message.userid == user.uid ? 'mine' : ''}`
     ].join(' ')}>
       <div className="bubble-container">
         <div className="bubble">

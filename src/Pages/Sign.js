@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Button, Container, Form, Col, Row } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useHistory } from 'react-router-dom';
-import { provider, app } from '../firebase';
+import { provider, app, database } from '../firebase';
 import { getCookie, setCookie } from '../Commons/Cookie'
 
 const Sign = (props) => {
@@ -11,6 +11,8 @@ const Sign = (props) => {
     const [emailSignup, setEmailSignup] = useState('');
     const [passwordSignin, setPasswordSignin] = useState('');
     const [passwordSignup, setPasswordSignup] = useState('');
+    const [nameSignup, setNameSignup] = useState('');
+    const [phoneSignup, setPhoneSignup] = useState('');
     const [user, setUser] = useState(sessionStorage.getItem('user'));
 
     const history = useHistory();
@@ -31,11 +33,21 @@ const Sign = (props) => {
     const handleOnPasswordSignupChange = (event) => {
         setPasswordSignup(event.target.value);
     }
+    const handleOnNameSignupChange = (event) => {
+        setNameSignup(event.target.value);
+    }
+    const handleOnPhoneSignupChange = (event) => {
+        setPhoneSignup(event.target.value);
+    }
     const handleSignUp = async (event) => {
         event.preventDefault();
         try {
             await app.auth().createUserWithEmailAndPassword(emailSignup, passwordSignup);
             const currentUser = app.auth().currentUser;
+            await currentUser.updateProfile({
+                displayName:nameSignup,
+                phoneNumber: phoneSignup
+            })
             const token = await getCurrentToken();
             if (token) {
                 setCookie('userToken', token);
@@ -97,9 +109,19 @@ const Sign = (props) => {
         event.preventDefault();
         try {
             await app.auth().signInWithEmailAndPassword(emailSignin, passwordSignin);
-            const currentUser = app.auth().currentUser;
             const token = await getCurrentToken();
             if (token) {
+                const currentUser = app.auth().currentUser;
+                const userData = await database.collection('users').doc(currentUser.uid).get();
+                if (!userData.exists) {
+                    console.log('userDatanotexist')
+                    await database.collection('users').doc(currentUser.uid).set({
+                        userName: currentUser.displayName,
+                        userEmail: currentUser.email,
+                        userPhoneNumber: currentUser.phoneNumber,
+                        userPhotoURL: currentUser.photoURL
+                    });
+                }
                 setCookie('userToken', token);
                 setUser(currentUser);
                 handleGotoRoom();
@@ -109,28 +131,32 @@ const Sign = (props) => {
         }
     }
 
-    const handleSignInWithGoogle = () => {
+    const handleSignInWithGoogle = async () => {
+        try {
+            const result = await app.auth().signInWithPopup(provider)
+            const token = result.credential.accessToken;
 
-        app.auth().signInWithPopup(provider).then(function (result) {
-            // This gives you a Google Access Token. You can use it to access the Google API.
-            console.log(result);
-            var token = result.credential.accessToken;
+            const currentUser = app.auth().currentUser;
+            const userData = await database.collection('users').doc(currentUser.uid).get();
+            if (!userData.exists) {
+                console.log('userDatanotexist')
+                await database.collection('users').doc(currentUser.uid).set({
+                    userName: currentUser.displayName,
+                    userEmail: currentUser.email,
+                    userPhoneNumber: currentUser.phoneNumber,
+                    userPhotoURL: currentUser.photoURL
+                });
+            }
             setCookie('userToken', token);
-            // The signed-in user info.
-            var currentUser = result.user;
             setUser(currentUser);
             handleGotoRoom();
-            // ...
-        }).catch(function (error) {
-            // Handle Errors here.
-            var errorCode = error.code;
-            var errorMessage = error.message;
+        } catch (error) {
             // The email of the user's account used.
             var email = error.email;
             // The firebase.auth.AuthCredential type that was used.
             var credential = error.credential;
-            // ...
-        });
+            console.log(error.code + error.message);
+        }
     }
     return (
         <Container className="d-flex flex-column justify-content-center pt-5">
@@ -149,48 +175,48 @@ const Sign = (props) => {
                         </Form.Group>
 
                         <Form.Group className="d-flex justify-content-center">
-                            <Button variant="primary" type="submit" className="w-100" onClick={handleSignIn}>Sign in</Button>
+                            <Button variant="info" type="submit" className="w-100" onClick={handleSignIn}>Sign in</Button>
                         </Form.Group>
-                        <Alert variant='warning' className="d-flex justify-content-between mt-3">
+                        <Alert variant='info' className="d-flex justify-content-between">
                             Don't have an account?
-                            <Button variant="primary" type="button" onClick={() => handleChangeSignType()}>Sign up</Button>
+                            <Button variant="info" type="button" onClick={() => handleChangeSignType()}>Sign up</Button>
                         </Alert>
-                        <Form.Row className="d-flex justify-content-between">
-                            <Button variant="primary" type="button" onClick={handleSignInWithGoogle}>Sign in with Google</Button>
-                        </Form.Row>
+                        <Form.Group className="d-flex justify-content-center">
+                            <Alert variant='info w-100 d-flex justify-content-center'>
+                                <Button variant="light" type="button" className="w-50" onClick={handleSignInWithGoogle}>
+                                    <img src="https://img.icons8.com/color/30/000000/google-logo.png" className="mr-2" />
+                                Sign in with Google</Button>
+                            </Alert>
+                        </Form.Group>
                     </Form>
                 ) || (
                     <Form>
-                        <Form.Row>
-                            <Form.Group as={Col} controlId="formGridEmail">
+                        <Form.Row className="w-100">
+                            <Form.Group as={Col} controlId="formGridEmail" className="pl-0">
                                 <Form.Label>Email</Form.Label>
-                                <Form.Control type="email" placeholder="Enter email" value={emailSignup} onChange={handleOnEmailSignupChange} />
+                                <Form.Control type="email" placeholder="Your email" value={emailSignup} onChange={handleOnEmailSignupChange} />
                             </Form.Group>
 
-                            <Form.Group as={Col} controlId="formGridPassword">
+                            <Form.Group as={Col} controlId="formGridPassword" className="pr-0">
                                 <Form.Label>Password</Form.Label>
-                                <Form.Control type="password" placeholder="Password" value={passwordSignup} onChange={handleOnPasswordSignupChange} />
+                                <Form.Control type="password" placeholder="Your password" value={passwordSignup} onChange={handleOnPasswordSignupChange} />
                             </Form.Group>
                         </Form.Row>
-                        {/* <Form.Row>
-                            <Form.Group as={Col} controlId="formGridAddress1">
-                                <Form.Label>Address</Form.Label>
-                                <Form.Control placeholder="1234 Main St" type="text" />
+                        <Form.Row className="w-100">
+                            <Form.Group as={Col} controlId="formGridName1" className="px-0">
+                                <Form.Label>Full Name</Form.Label>
+                                <Form.Control placeholder="Your name" type="name" value={nameSignup} onChange={handleOnNameSignupChange} />
                             </Form.Group>
                         </Form.Row>
-                        <Form.Row>
-                            <Form.Group as={Col} controlId="formGridState">
-                                <Form.Label>State</Form.Label>
-                                <Form.Control as="select" defaultValue="Choose...">
-                                    <option>Choose...</option>
-                                    <option>Male</option>
-                                    <option>Female</option>
-                                </Form.Control>
+                        <Form.Row className="w-100">
+                            <Form.Group as={Col} controlId="formGridPhone1" className="px-0">
+                                <Form.Label>Phone nunber</Form.Label>
+                                <Form.Control placeholder="Your phone" type="phone" value={phoneSignup} onChange={handleOnPhoneSignupChange} />
                             </Form.Group>
-                        </Form.Row> */}
-                        <Form.Row className="d-flex justify-content-between">
-                            <Button type="button" variant="primary" onClick={handleChangeSignType}>Back</Button>
-                            <Button variant="primary" type="submit" onClick={handleSignUp}>Sign up</Button>
+                        </Form.Row>
+                        <Form.Row className="d-flex justify-content-between w-100">
+                            <Button type="button" variant="danger" onClick={handleChangeSignType}>Back</Button>
+                            <Button variant="info" type="submit" onClick={handleSignUp}>Sign up</Button>
                         </Form.Row>
                     </Form>
                 )
