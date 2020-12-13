@@ -11,17 +11,14 @@ import Profile from './Pages/Profile';
 function App() {
   return (
     <Router>
-        <Switch>
-          <Route path="/sign">
-            <Sign />
-          </Route>
-          <Route path="/profile">
-            <Profile />
-          </Route>
-          <Route path="/room">
-            <Room />
-          </Route>
-        </Switch>
+      <Switch>
+        <Route path="/sign" component={Sign}>
+        </Route>
+        <Route path="/profile" component={Profile}>
+        </Route>
+        <Route path="/room/:id" component={Room}>
+        </Route>
+      </Switch>
     </Router>
   );
 }

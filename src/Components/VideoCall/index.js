@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './VideoCall.css';
 import { Alert, Button, Container, Form, Col, Row } from 'react-bootstrap';
-import {app, database} from '../../firebase';
+import { app, database } from '../../firebase';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 
@@ -46,11 +46,29 @@ import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 //     return await navigator.mediaDevices.getUserMedia(constraints);
 // }
+
+
 export default function VideoCall(props) {
+    const { localStream } = props;
+    const [remoteStreams, setRemoteStreams] = useState([1, 2, 3, 4]);
+    useEffect(() => {
+        if (localStream) document.querySelector('video#localVideo').srcObject = localStream;
+    }, [localStream]);
+
+
+
     return (
         <div className="videoCallContainer">
-            <video id="localVideo" className="bg-dark r-0" autoPlay playsInline controls={false} />
-            <video id="remoteVideo" className="bg-dark" autoPlay playsInline controls={false} />
+            {
+                localStream && <video id="localVideo" className="bg-dark r-0" autoPlay playsInline controls={false} />
+            }
+            {
+                remoteStreams.map((remoteStream, index) => {
+                    return (
+                        <video className="bg-dark" key={index} autoPlay playsInline controls={false} />
+                    );
+                })
+            }
         </div>
     );
 }

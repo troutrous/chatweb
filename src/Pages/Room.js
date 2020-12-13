@@ -31,9 +31,19 @@ const constraints = {
     }
 }
 
-const Room = () => {
+const roomCollectionRef = database.collection("rooms");
+const userCollectionRef = database.collection("users");
+
+const Room = (props) => {
+
+    const [roomIDParam, setRoomIDParam] = useState(props.match.params.id);
+
     const [user, setUser] = useState(null);
     const [room, setRoom] = useState(null);
+
+    const [roomRef, setRoomRef] = useState();
+    const [userRef, setUserRef] = useState();
+
     const [localStream, setLocalStream] = useState();
     // const [remoteStream, setRemoteStream] = useState(new MediaStream());
     const [localConnections, setLocalConnections] = useState([]);
@@ -67,22 +77,106 @@ const Room = () => {
 
     useEffect(() => {
         const userToken = getCookie('userToken');
-        if (userToken) {
-            getCurrentToken()
-                .then((token) => {
-                    setCookie('userToken', token);
-                    setUser(app.auth().currentUser);
-                })
-                .catch((err) => handleGotoSign());
-        } else {
-            handleGotoSign();
-        }
-        return;
+
+        if (!userToken) { handleGotoSign(); return; }
+        getCurrentToken()
+            .then((token) => {
+                setCookie('userToken', token);
+                setUser(app.auth().currentUser);
+                setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
+                setRoomRef(roomCollectionRef.doc(roomIDParam));
+            })
+            .catch((err) => handleGotoSign())
+        return () => {
+
+        };
     }, []);
 
+    const setOnMembers = async () => {
+        if (!roomRef) return null;
+
+        const membersRef = await roomRef.collection('members');
+        const membersSnapshot = await membersRef.where('memberID', '==', user.uid).get();
+        let localMemberRef;
+        if (!membersSnapshot.empty) {
+            membersSnapshot.forEach(async memberSnap => {
+                localMemberRef = await membersRef.doc(memberSnap.id)
+                await localMemberRef.update({
+                    memberStatus: true,
+                    memberTimeJoin: new Date(),
+                })
+            });
+        } else {
+            localMemberRef = await membersRef.doc();
+            await membersRef.set({
+                memberID: user.uid,
+                memberTimeJoin: new Date(),
+                memberStatus: true,
+            });
+        }
+        //join room
+        const userStream = (await navigator.mediaDevices.getUserMedia(constraints));
+        setLocalStream(userStream);
+        const localMember = (await localMemberRef.get()).data();
+
+        let unsubscribeMembers = roomRef.collection('members').onSnapshot((doc) => {
+            doc.docChanges().forEach(async (change) => {
+                const memberChange = change.doc.data();
+                if (change.type === 'modified') {
+                    if (localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberID != memberChange.memberID) {
+                        // roomRef.collection('peerConnections').doc().set(
+                        //     {
+                        //         memberOfferID: localMember.memberID,
+                        //         memberAnswerID: memberChange.memberID,
+                        //         connectedAt: new Date()
+                        //     }
+                        // );
+                        console.log("create connected");
+                    }
+                }
+            })
+        });
+
+        return unsubscribeMembers;
+    }
+
+    const setOffMembers = async () => {
+        if (!roomRef) return;
+        const membersSnapshot = await roomRef.collection('members').where('memberID', '==', user.uid).get();
+        if (!membersSnapshot.empty) {
+            membersSnapshot.forEach(memberSnap => {
+                roomRef.collection('members').doc(memberSnap.id).update({
+                    memberStatus: false,
+                })
+            });
+            return;
+        };
+    }
+
+    const setRoomJoined = async () => {
+        if (!userRef) return;
+        const roomJoinedSnapshot = await userRef.collection('roomJoined').doc(roomIDParam).get();
+        if (!roomJoinedSnapshot.exists) {
+            userRef.collection('roomJoined').doc(roomIDParam).set({
+                joinedAt: new Date()
+            });
+        }
+    };
+
     useEffect(() => {
-        if (localStream) document.querySelector('video#localVideo').srcObject = localStream;
-    }, [localStream]);
+        let unsubscribeMembers = setOnMembers();
+        return () => {
+          
+        };
+    }, [roomRef]);
+    useEffect(() => {
+        setRoomJoined();
+        return;
+    }, [userRef]);
+
+    // useEffect(() => {
+    //     if (localStream) document.querySelector('video#localVideo').srcObject = localStream;
+    // }, [localStream]);
 
     // useEffect(() => {
     //     console.log("thay doi remote" + remoteStream.getTracks().length);
@@ -103,7 +197,7 @@ const Room = () => {
         const messagesRef = roomRef.collection('messages');
         setMessagesRef(messagesRef);
         setQuery(messagesRef.orderBy('createdAt').limit(25));
-        
+
         setRoom(roomRef.id);
         //tạo mới member
         const localMemberRef = await roomRef.collection('members').doc();
@@ -357,29 +451,32 @@ const Room = () => {
     const handleAddMessage = async (e, message) => {
         e.preventDefault();
         messagesRef.add({
-          text: message,
-          createdAt: new Date(),
-          userid: user.uid,
+            text: message,
+            createdAt: new Date(),
+            userid: user.uid,
         });
-      }
+    }
 
-    return !user ?
-        (
-            null
-        ) :
-        (
-            <Row className="row-cols-3 h-100 w-100 overflow-hidden m-0">
-                <Col className="col-2 overflow-hidden h-100 w-100 p-0">
-                    <MessageList messages={messages} handleAddMessage={handleAddMessage} user={user}/>
-                </Col>
-                <Col className="col-8 h-100 w-100 p-0">
-                    <VideoCall />
-                </Col>
-                <Col className="col-2 h-100 w-100 p-0">
-                    <RoomInfo user={user} room={room} handleGotoSign={handleGotoSign} createRoom={createRoom} joinRoom={joinRoom} />
-                </Col>
-            </Row>
-        );
+    return (
+        <div className="h-100 w-100">
+            {
+                userRef && roomRef && (
+                    <Row className="row-cols-3 h-100 w-100 overflow-hidden m-0">
+                        <Col className="col-2 overflow-hidden h-100 w-100 p-0">
+                            <MessageList messages={messages} handleAddMessage={handleAddMessage} user={user} />
+                        </Col>
+                        <Col className="col-8 h-100 w-100 p-0">
+                            <VideoCall localStream={localStream} />
+                        </Col>
+                        <Col className="col-2 h-100 w-100 p-0">
+                            <RoomInfo user={user} roomid={roomRef.id} setOffMembers={setOffMembers} />
+                        </Col>
+                    </Row>
+                )
+            }
+        </div>
+
+    );
 }
 
 export default Room;

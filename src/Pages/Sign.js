@@ -16,7 +16,7 @@ const Sign = (props) => {
     const [user, setUser] = useState(sessionStorage.getItem('user'));
 
     const history = useHistory();
-    const handleGotoRoom = useCallback(() => history.push('/room'), [history]);
+    const handleGotoProfile = useCallback(() => history.push('/profile'), [history]);
     const handleChangeSignType = () => {
         signType == "Signin" ? setSignType("Signup") : setSignType("Signin");
     }
@@ -52,7 +52,7 @@ const Sign = (props) => {
             if (token) {
                 setCookie('userToken', token);
                 setUser(currentUser);
-                handleGotoRoom();
+                handleGotoProfile();
             }
         } catch (error) {
             console.log(error);
@@ -124,7 +124,7 @@ const Sign = (props) => {
                 }
                 setCookie('userToken', token);
                 setUser(currentUser);
-                handleGotoRoom();
+                handleGotoProfile();
             }
         } catch (error) {
             alert(error.message);
@@ -149,7 +149,7 @@ const Sign = (props) => {
             }
             setCookie('userToken', token);
             setUser(currentUser);
-            handleGotoRoom();
+            handleGotoProfile();
         } catch (error) {
             // The email of the user's account used.
             var email = error.email;
@@ -166,7 +166,7 @@ const Sign = (props) => {
                         <Form.Group controlId="formBasicEmail">
                             <Form.Label>Email address</Form.Label>
                             <Form.Control type="email" placeholder="Enter email" value={emailSignin} onChange={handleOnEmailSigninChange} />
-                            <Form.Text className="text-muted">We'll never share your email with anyone else.</Form.Text>
+                            <Form.Text className="text-muted">We'll never share your email wiYth anyone else.</Form.Text>
                         </Form.Group>
 
                         <Form.Group controlId="formBasicPassword">
