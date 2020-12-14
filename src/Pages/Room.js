@@ -95,7 +95,7 @@ const Room = (props) => {
     const setOnMembers = async () => {
         if (!roomRef) return null;
 
-        const membersRef = await roomRef.collection('members');
+        const membersRef = roomRef.collection('members');
         const membersSnapshot = await membersRef.where('memberID', '==', user.uid).get();
         let localMemberRef;
         if (!membersSnapshot.empty) {
@@ -108,7 +108,7 @@ const Room = (props) => {
             });
         } else {
             localMemberRef = await membersRef.doc();
-            await membersRef.set({
+            await localMemberRef.set({
                 memberID: user.uid,
                 memberTimeJoin: new Date(),
                 memberStatus: true,
@@ -120,6 +120,7 @@ const Room = (props) => {
         const localMember = (await localMemberRef.get()).data();
 
         let unsubscribeMembers = roomRef.collection('members').onSnapshot((doc) => {
+            debugger;
             doc.docChanges().forEach(async (change) => {
                 const memberChange = change.doc.data();
                 if (change.type === 'modified') {
@@ -131,7 +132,8 @@ const Room = (props) => {
                         //         connectedAt: new Date()
                         //     }
                         // );
-                        console.log("create connected");
+                        console.log("create connected", memberChange);
+                        debugger;
                     }
                 }
             })
@@ -164,10 +166,164 @@ const Room = (props) => {
     };
 
     useEffect(() => {
-        let unsubscribeMembers = setOnMembers();
-        return () => {
-          
-        };
+        if (!roomRef) return null;
+
+        let membersRef = roomRef.collection('members');
+        let membersSnapshot;
+        let localMemberRef;
+        let localMember;
+        let unsubscribeMembers = null;
+        let unsubscribeConnections = null;
+        membersRef.where('memberID', '==', user.uid).get()
+            .then((membersSnapshotPromise) => {
+                membersSnapshot = membersSnapshotPromise;
+            })
+            .then(() => {
+                if (!membersSnapshot.empty) {
+                    membersSnapshot.forEach(async memberSnap => {
+                        localMemberRef = membersRef.doc(memberSnap.id);
+                        localMemberRef.update({
+                            memberStatus: true,
+                            memberTimeJoin: new Date(),
+                        })
+                    });
+                } else {
+                    localMemberRef = membersRef.doc();
+                    localMemberRef.set({
+                        memberID: user.uid,
+                        memberTimeJoin: new Date(),
+                        memberStatus: true,
+                    });
+                }
+            })
+            .then(() => {
+                return localMemberRef.get();
+            })
+            .then((localMemberPromise) => {
+                localMember = localMemberPromise.data();
+                unsubscribeMembers = roomRef.collection('members').onSnapshot((doc) => {
+                    doc.docChanges().forEach(async (change) => {
+                        const memberChange = change.doc.data();
+                        if (change.type === 'modified' && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberID != memberChange.memberID) {
+                                // roomRef.collection('peerConnections').doc().set(
+                                //     {
+                                //         memberOfferID: localMember.memberID,
+                                //         memberAnswerID: memberChange.memberID,
+                                //         connectedAt: new Date()
+                                //     }
+                                // );
+                                console.log('connected modified');
+                        }
+                        else if(change.type === 'added' && memberChange.memberStatus == true && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && localMember.memberID != memberChange.memberID) {
+                            console.log('connected added');
+                            console.log(localMember.memberID);
+                            console.log(localMember.memberTimeJoin);
+                            console.log(memberChange.memberID);
+                            console.log(memberChange.memberTimeJoin);
+                        }
+                    })
+                });
+            })
+            // .then(() => {
+            //     const timeStart = new Date();
+            //     unsubscribeConnections = roomRef.collection('peerConnections').onSnapshot((snapshot) => {
+                    
+            //         snapshot.docChanges().forEach(async (connectionRef) => {
+            //             let connectionData = connectionRef.doc.data();
+            //             console.log(timeStart - connectionData.connectedAt.toDate());
+            //             if (connectionRef.type === 'added' && connectionData.memberOfferID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
+            //                 console.log("add peerConnections with offer");
+            //             }
+            //             if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
+            //                 console.log("add peerConnections with answer");
+
+            //                 // let tempConnections = localConnections;
+            //                 // tempConnections.push(connectionData);
+            //                 // setLocalConnections(tempConnections);
+
+            //                 // const peerConnection = new RTCPeerConnection(configuration);
+            //                 // const remoteStream = new MediaStream();
+            //                 // document.querySelector('video#remoteVideo').srcObject = remoteStream;
+
+            //                 // userStream.getTracks().forEach(track => {
+            //                 //     peerConnection.addTrack(track, userStream);
+            //                 // });
+
+            //                 // peerConnection.onicecandidate = (event) => {
+            //                 //     if (!event.candidate) {
+            //                 //         console.log("Got Final Candidate!");
+            //                 //         return;
+            //                 //     }
+            //                 //     console.log('Got candidate: ', event.candidate);
+            //                 //     connectionRef.doc.ref.collection("calleeCandidates").add(event.candidate.toJSON());
+            //                 // }
+
+            //                 // connectionRef.doc.ref.onSnapshot(async (doc) => {
+            //                 //     console.log("connectionRef CHANGE")
+            //                 //     if (!doc.data().answer && doc.data().offer) {
+            //                 //         const offer = doc.data().offer;
+            //                 //         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            //                 //         const answer = await peerConnection.createAnswer();
+            //                 //         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
+
+            //                 //         const roomWithAnswer = {
+            //                 //             answer: {
+            //                 //                 type: answer.type,
+            //                 //                 sdp: answer.sdp,
+            //                 //             },
+            //                 //         };
+            //                 //         await doc.ref.update(roomWithAnswer);
+
+            //                 //         connectionRef.doc.ref.collection('callerCandidates').onSnapshot(snapshot => {
+            //                 //             snapshot.docChanges().forEach(async changeIceCandidate => {
+            //                 //                 if (changeIceCandidate.type === 'added') {
+            //                 //                     console.log("addIceCandidate");
+            //                 //                     await peerConnection.addIceCandidate(changeIceCandidate.doc.data());
+            //                 //                 }
+            //                 //                 console.log("addIceCandidate");
+            //                 //             });
+            //                 //         });
+            //                 //     }
+            //                 // })
+
+            //                 // peerConnection.ontrack = (event) => {
+            //                 //     event.streams[0].getTracks().forEach(track => {
+            //                 //         remoteStream.addTrack(track);
+            //                 //     });
+            //                 // };
+
+            //                 // peerConnection.onconnectionstatechange = (event) => {
+            //                 //     switch (peerConnection.connectionState) {
+            //                 //         case "disconnected":
+            //                 //             remoteStream.getTracks().forEach((track) => {
+            //                 //                 track.stop();
+            //                 //             })
+            //                 //             break;
+            //                 //         case "failed":
+            //                 //             remoteStream.getTracks().forEach((track) => {
+            //                 //                 console.log(remoteStream);
+            //                 //                 remoteStream.removeTrack(track);
+            //                 //             })
+            //                 //             break;
+
+            //                 //         default:
+            //                 //             break;
+            //                 //     }
+            //                 // }
+            //             }
+            //         })
+            //     });
+            // })
+
+        return (async () => {
+            if (unsubscribeMembers) {
+                await unsubscribeMembers();
+            }
+            if (unsubscribeConnections) {
+                await unsubscribeConnections();
+            }
+        })
+
     }, [roomRef]);
     useEffect(() => {
         setRoomJoined();
