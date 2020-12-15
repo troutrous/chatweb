@@ -50,10 +50,19 @@ import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 export default function VideoCall(props) {
     const { localStream } = props;
-    const [remoteStreams, setRemoteStreams] = useState([1, 2, 3, 4]);
+    const { remoteStreams } = props;
+
     useEffect(() => {
         if (localStream) document.querySelector('video#localVideo').srcObject = localStream;
     }, [localStream]);
+
+    useEffect(() => {
+        if (localStream) {
+            remoteStreams.forEach((remoteStream, index) => {
+                document.querySelector('video#remoteStream' + index).srcObject = remoteStream;
+            })
+        };
+    }, [remoteStreams]);
 
 
 
@@ -65,7 +74,7 @@ export default function VideoCall(props) {
             {
                 remoteStreams.map((remoteStream, index) => {
                     return (
-                        <video className="bg-dark" key={index} autoPlay playsInline controls={false} />
+                        <video className="bg-dark" id={"remoteStream" + index} key={index} autoPlay playsInline controls={false} />
                     );
                 })
             }

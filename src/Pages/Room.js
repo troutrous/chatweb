@@ -45,7 +45,7 @@ const Room = (props) => {
     const [userRef, setUserRef] = useState();
 
     const [localStream, setLocalStream] = useState();
-    // const [remoteStream, setRemoteStream] = useState(new MediaStream());
+    const [remoteStreams, setRemoteStreams] = useState([]);
     const [localConnections, setLocalConnections] = useState([]);
     const [query, setQuery] = useState(null);
     const [messagesRef, setMessagesRef] = useState(null);
@@ -77,18 +77,37 @@ const Room = (props) => {
 
     useEffect(() => {
         const userToken = getCookie('userToken');
-
+        let tempLocalStream;
         if (!userToken) { handleGotoSign(); return; }
         getCurrentToken()
             .then((token) => {
                 setCookie('userToken', token);
                 setUser(app.auth().currentUser);
+                return navigator.mediaDevices.getUserMedia(constraints);
+            })
+            .then((stream) => {
+                console.log("add localStream");
+                tempLocalStream = stream;
+                setLocalStream(stream);
+
+            })
+            .catch((err) => {
+                // handleGotoSign();
+                console.log(err.message);
+            })
+            .finally(() => {
                 setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
                 setRoomRef(roomCollectionRef.doc(roomIDParam));
             })
-            .catch((err) => handleGotoSign())
         return () => {
-
+            if (tempLocalStream) {
+                tempLocalStream.getTracks().forEach(function (track) {
+                    track.stop();
+                });
+            }
+            setLocalStream(null);
+            setUserRef(null);
+            setRoomRef(null);
         };
     }, []);
 
@@ -179,17 +198,18 @@ const Room = (props) => {
                 membersSnapshot = membersSnapshotPromise;
             })
             .then(() => {
+                console.log("step1");
                 if (!membersSnapshot.empty) {
                     membersSnapshot.forEach(async memberSnap => {
                         localMemberRef = membersRef.doc(memberSnap.id);
-                        localMemberRef.update({
+                        return localMemberRef.update({
                             memberStatus: true,
                             memberTimeJoin: new Date(),
                         })
                     });
                 } else {
                     localMemberRef = membersRef.doc();
-                    localMemberRef.set({
+                    return localMemberRef.set({
                         memberID: user.uid,
                         memberTimeJoin: new Date(),
                         memberStatus: true,
@@ -197,123 +217,233 @@ const Room = (props) => {
                 }
             })
             .then(() => {
+                console.log("step2");
                 return localMemberRef.get();
             })
             .then((localMemberPromise) => {
+                console.log("step3");
                 localMember = localMemberPromise.data();
+                const newDate = new Date()
                 unsubscribeMembers = roomRef.collection('members').onSnapshot((doc) => {
                     doc.docChanges().forEach(async (change) => {
                         const memberChange = change.doc.data();
                         if (change.type === 'modified' && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberID != memberChange.memberID) {
-                                // roomRef.collection('peerConnections').doc().set(
-                                //     {
-                                //         memberOfferID: localMember.memberID,
-                                //         memberAnswerID: memberChange.memberID,
-                                //         connectedAt: new Date()
-                                //     }
-                                // );
-                                console.log('connected modified');
+                            roomRef.collection('peerConnections').doc().set(
+                                {
+                                    memberOfferID: localMember.memberID,
+                                    memberAnswerID: memberChange.memberID,
+                                    connectedAt: new Date()
+                                }
+                            );
                         }
-                        else if(change.type === 'added' && memberChange.memberStatus == true && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && localMember.memberID != memberChange.memberID) {
-                            console.log('connected added');
-                            console.log(localMember.memberID);
-                            console.log(localMember.memberTimeJoin);
-                            console.log(memberChange.memberID);
-                            console.log(memberChange.memberTimeJoin);
+                        else if (change.type === 'added' && memberChange.memberStatus == true && newDate - memberChange.memberTimeJoin.toDate() < 0 && localMember.memberID != memberChange.memberID) {
+                            roomRef.collection('peerConnections').doc().set(
+                                {
+                                    memberOfferID: localMember.memberID,
+                                    memberAnswerID: memberChange.memberID,
+                                    connectedAt: new Date()
+                                }
+                            );
                         }
                     })
                 });
             })
-            // .then(() => {
-            //     const timeStart = new Date();
-            //     unsubscribeConnections = roomRef.collection('peerConnections').onSnapshot((snapshot) => {
-                    
-            //         snapshot.docChanges().forEach(async (connectionRef) => {
-            //             let connectionData = connectionRef.doc.data();
-            //             console.log(timeStart - connectionData.connectedAt.toDate());
-            //             if (connectionRef.type === 'added' && connectionData.memberOfferID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
-            //                 console.log("add peerConnections with offer");
-            //             }
-            //             if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
-            //                 console.log("add peerConnections with answer");
+            .then(() => {
+                console.log("step4");
+                const timeStart = new Date();
+                unsubscribeConnections = roomRef.collection('peerConnections').onSnapshot((snapshot) => {
 
-            //                 // let tempConnections = localConnections;
-            //                 // tempConnections.push(connectionData);
-            //                 // setLocalConnections(tempConnections);
+                    snapshot.docChanges().forEach(async (connectionRef) => {
+                        let connectionData = connectionRef.doc.data();
+                        if (connectionRef.type === 'added' && connectionData.memberOfferID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
+                            console.log("peer offer");
+                            const peerConnection = new RTCPeerConnection(configuration);
+                            const remoteStream = new MediaStream();
+                            const indexStream = remoteStreams.length;
+                            setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
 
-            //                 // const peerConnection = new RTCPeerConnection(configuration);
-            //                 // const remoteStream = new MediaStream();
-            //                 // document.querySelector('video#remoteVideo').srcObject = remoteStream;
+                            if (localStream) {
+                                console.log("add localStream");
+                                localStream.getTracks().forEach(track => {
+                                    peerConnection.addTrack(track, localStream);
+                                });
+                            }
 
-            //                 // userStream.getTracks().forEach(track => {
-            //                 //     peerConnection.addTrack(track, userStream);
-            //                 // });
 
-            //                 // peerConnection.onicecandidate = (event) => {
-            //                 //     if (!event.candidate) {
-            //                 //         console.log("Got Final Candidate!");
-            //                 //         return;
-            //                 //     }
-            //                 //     console.log('Got candidate: ', event.candidate);
-            //                 //     connectionRef.doc.ref.collection("calleeCandidates").add(event.candidate.toJSON());
-            //                 // }
+                            peerConnection.onicecandidate = (event) => {
+                                if (!event.candidate) {
+                                    // console.log("Got Final Candidate!");
+                                    return;
+                                }
+                                console.log('Got candidate');
+                                connectionRef.doc.ref.collection("callerCandidates").add(event.candidate.toJSON());
+                            }
+                            console.log("create offer");
+                            const offer = await peerConnection.createOffer();
+                            const roomWithOffer = {
+                                offer: {
+                                    type: offer.type,
+                                    sdp: offer.sdp
+                                }
+                            }
+                            //đặt localdescription
+                            console.log('setLocalDescription');
+                            await peerConnection.setLocalDescription(offer);
 
-            //                 // connectionRef.doc.ref.onSnapshot(async (doc) => {
-            //                 //     console.log("connectionRef CHANGE")
-            //                 //     if (!doc.data().answer && doc.data().offer) {
-            //                 //         const offer = doc.data().offer;
-            //                 //         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            //                 //         const answer = await peerConnection.createAnswer();
-            //                 //         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
+                            //cập nhật lại room
+                            await connectionRef.doc.ref.update(roomWithOffer);
 
-            //                 //         const roomWithAnswer = {
-            //                 //             answer: {
-            //                 //                 type: answer.type,
-            //                 //                 sdp: answer.sdp,
-            //                 //             },
-            //                 //         };
-            //                 //         await doc.ref.update(roomWithAnswer);
+                            connectionRef.doc.ref.onSnapshot(async doc => {
+                                const data = doc.data();
+                                if (!peerConnection.currentRemoteDescription && data && data.answer) {
+                                    console.log('setRemoteDescription');
+                                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                }
+                            });
 
-            //                 //         connectionRef.doc.ref.collection('callerCandidates').onSnapshot(snapshot => {
-            //                 //             snapshot.docChanges().forEach(async changeIceCandidate => {
-            //                 //                 if (changeIceCandidate.type === 'added') {
-            //                 //                     console.log("addIceCandidate");
-            //                 //                     await peerConnection.addIceCandidate(changeIceCandidate.doc.data());
-            //                 //                 }
-            //                 //                 console.log("addIceCandidate");
-            //                 //             });
-            //                 //         });
-            //                 //     }
-            //                 // })
+                            connectionRef.doc.ref.collection('calleeCandidates').onSnapshot(doc => {
+                                doc.docChanges().forEach(async change => {
+                                    if (change.type === 'added') {
+                                        console.log("addIceCandidate");
+                                        try {
+                                            await peerConnection.addIceCandidate(change.doc.data());
+                                        } catch (error) {
+                                            console.log(error);
+                                        }
+                                    }
+                                });
+                            });
 
-            //                 // peerConnection.ontrack = (event) => {
-            //                 //     event.streams[0].getTracks().forEach(track => {
-            //                 //         remoteStream.addTrack(track);
-            //                 //     });
-            //                 // };
+                            peerConnection.ontrack = (event) => {
+                                console.log("received track");
+                                event.streams[0].getTracks().forEach(track => {
+                                    remoteStream.addTrack(track);
+                                });
+                                
+                                setRemoteStreams(() => {
+                                    let copyStreams = remoteStreams;
+                                    copyStreams[indexStream] = remoteStream;
+                                    return copyStreams;
+                                });
+                            };
 
-            //                 // peerConnection.onconnectionstatechange = (event) => {
-            //                 //     switch (peerConnection.connectionState) {
-            //                 //         case "disconnected":
-            //                 //             remoteStream.getTracks().forEach((track) => {
-            //                 //                 track.stop();
-            //                 //             })
-            //                 //             break;
-            //                 //         case "failed":
-            //                 //             remoteStream.getTracks().forEach((track) => {
-            //                 //                 console.log(remoteStream);
-            //                 //                 remoteStream.removeTrack(track);
-            //                 //             })
-            //                 //             break;
+                            // peerConnection.onconnectionstatechange = (event) => {
+                            //     switch (peerConnection.connectionState) {
+                            //         case "disconnected":
+                            //             remoteStream.getTracks().forEach((track) => {
+                            //                 track.stop();
+                            //             })
+                            //             break;
+                            //         case "failed":
+                            //             remoteStream.getTracks().forEach((track) => {
+                            //                 console.log(remoteStream);
+                            //                 remoteStream.removeTrack(track);
+                            //             })
+                            //             break;
 
-            //                 //         default:
-            //                 //             break;
-            //                 //     }
-            //                 // }
-            //             }
-            //         })
-            //     });
-            // })
+                            //         default:
+                            //             break;
+                            //     }
+                            // }
+
+
+                        }
+                        if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid && timeStart - connectionData.connectedAt.toDate() < 0) {
+
+                            // let tempConnections = localConnections;
+                            // tempConnections.push(connectionData);
+                            // setLocalConnections(tempConnections);
+                            console.log("peer answer");
+                            const peerConnection = new RTCPeerConnection(configuration);
+                            const remoteStream = new MediaStream();
+                            let indexStream = remoteStreams.length;
+                            setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
+
+
+                            if (localStream) {
+                                console.log("add localStream");
+                                localStream.getTracks().forEach(track => {
+                                    peerConnection.addTrack(track, localStream);
+                                });
+                            }
+
+                            peerConnection.onicecandidate = (event) => {
+                                if (!event.candidate) {
+                                    // console.log("Got Final Candidate!");
+                                    return;
+                                }
+                                console.log('Got candidate');
+                                connectionRef.doc.ref.collection("calleeCandidates").add(event.candidate.toJSON());
+                            }
+
+                            connectionRef.doc.ref.onSnapshot(async (doc) => {
+                                if (!doc.data().answer && doc.data().offer) {
+                                    const offer = doc.data().offer;
+                                    console.log("setRemoteDescription");
+                                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                                    const answer = await peerConnection.createAnswer();
+                                    console.log("setLocalDescription");
+                                    await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
+
+                                    const roomWithAnswer = {
+                                        answer: {
+                                            type: answer.type,
+                                            sdp: answer.sdp,
+                                        },
+                                    };
+                                    console.log("create answer");
+                                    await doc.ref.update(roomWithAnswer);
+
+                                    connectionRef.doc.ref.collection('callerCandidates').onSnapshot(snapshot => {
+                                        snapshot.docChanges().forEach(async changeIceCandidate => {
+                                            if (changeIceCandidate.type === 'added') {
+                                                // console.log("addIceCandidate");
+                                                await peerConnection.addIceCandidate(changeIceCandidate.doc.data());
+                                            }
+                                            console.log("addIceCandidate");
+                                        });
+                                    });
+                                }
+                            })
+
+                            peerConnection.ontrack = (event) => {
+                                console.log("received track");
+                                event.streams[0].getTracks().forEach(track => {
+                                    remoteStream.addTrack(track);
+                                });
+                                
+                                setRemoteStreams(() => {
+                                    let copyStreams = remoteStreams;
+                                    copyStreams[indexStream] = remoteStream;
+                                    return copyStreams;
+                                });
+                            };
+
+                            // peerConnection.onconnectionstatechange = (event) => {
+                            //     switch (peerConnection.connectionState) {
+                            //         case "disconnected":
+                            //             remoteStream.getTracks().forEach((track) => {
+                            //                 track.stop();
+                            //             })
+                            //             break;
+                            //         case "failed":
+                            //             remoteStream.getTracks().forEach((track) => {
+                            //                 console.log(remoteStream);
+                            //                 remoteStream.removeTrack(track);
+                            //             })
+                            //             break;
+
+                            //         default:
+                            //             break;
+                            //     }
+                            // }
+                        }
+                    })
+                });
+            }).catch((err) =>
+                console.log(err.message)
+            )
+
 
         return (async () => {
             if (unsubscribeMembers) {
@@ -622,7 +752,7 @@ const Room = (props) => {
                             <MessageList messages={messages} handleAddMessage={handleAddMessage} user={user} />
                         </Col>
                         <Col className="col-8 h-100 w-100 p-0">
-                            <VideoCall localStream={localStream} />
+                            <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
                             <RoomInfo user={user} roomid={roomRef.id} setOffMembers={setOffMembers} />
