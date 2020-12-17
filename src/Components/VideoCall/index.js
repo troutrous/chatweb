@@ -57,9 +57,12 @@ export default function VideoCall(props) {
     }, [localStream]);
 
     useEffect(() => {
-        if (localStream) {
+        if (remoteStreams) {
             remoteStreams.forEach((remoteStream, index) => {
-                document.querySelector('video#remoteStream' + index).srcObject = remoteStream;
+                if (remoteStream) {
+                    document.querySelector('video#remoteStream' + index).srcObject = remoteStream;
+                    // console.log("cập nhật lại remoteStream", index);
+                }
             })
         };
     }, [remoteStreams]);
