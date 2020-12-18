@@ -39,19 +39,22 @@ const Room = (props) => {
     const [roomIDParam, setRoomIDParam] = useState(props.match.params.id);
 
     const [user, setUser] = useState(null);
-    const [room, setRoom] = useState(null);
 
     const [roomRef, setRoomRef] = useState();
     const [userRef, setUserRef] = useState();
 
     const [localStream, setLocalStream] = useState();
     const [remoteStreams, setRemoteStreams] = useState([]);
-    const [localConnections, setLocalConnections] = useState([]);
+
     const [query, setQuery] = useState(null);
     const [messagesRef, setMessagesRef] = useState(null);
+
+    const [peerConnections, setPeerConnections] = useState([]);
+
     const [messages] = useCollectionData(query, { idField: 'id' });
     const history = useHistory();
     const handleGotoSign = useCallback(() => history.replace('/sign'), [history]);
+
     const getCurrentToken = async () => {
         const currentUser = app.auth().currentUser;
         if (currentUser) return currentUser;
@@ -110,6 +113,10 @@ const Room = (props) => {
             setRoomRef(null);
         };
     }, []);
+
+    useEffect(() => {
+        console.log(peerConnections.length);
+    }, [peerConnections])
 
     const setOffMembers = async () => {
         if (!roomRef) return;
@@ -194,19 +201,26 @@ const Room = (props) => {
                     snapshot.docChanges().forEach(async (connectionRef) => {
                         let connectionData = connectionRef.doc.data();
                         localMember = (await localMemberRef.get()).data();
-
+                        let offerOptions;
 
                         if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0) {
                             console.log("peer offer", connectionData.memberAnswerID);
                             const peerConnection = new RTCPeerConnection(configuration);
+                            setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
                             const remoteStream = new MediaStream();
-                            const indexStream = remoteStreams.length;
 
                             if (localStream) {
                                 // console.log("add localStream");
                                 localStream.getTracks().forEach(track => {
                                     peerConnection.addTrack(track, localStream);
                                 });
+                                offerOptions = {};
+                            }
+                            else {
+                                offerOptions = {
+                                    offerToReceiveAudio: true,
+                                    offerToReceiveVideo: true
+                                }
                             }
 
                             peerConnection.onicecandidate = (event) => {
@@ -218,7 +232,8 @@ const Room = (props) => {
                                 connectionRef.doc.ref.collection("callerCandidates").add(event.candidate.toJSON());
                             }
                             // console.log("create offer");
-                            const offer = await peerConnection.createOffer();
+
+                            const offer = await peerConnection.createOffer(offerOptions);
                             const roomWithOffer = {
                                 offer: {
                                     type: offer.type,
@@ -237,6 +252,9 @@ const Room = (props) => {
                                 if (!peerConnection.currentRemoteDescription && data && data.answer) {
                                     // console.log('setRemoteDescription');
                                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                }
+                                if (data.isClosed == true) {
+                                    console.log('tat connection');
                                 }
                             });
 
@@ -258,10 +276,13 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
+                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
+                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
+                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -270,33 +291,41 @@ const Room = (props) => {
                                 }
                             };
 
-                            // peerConnection.onconnectionstatechange = (event) => {
-                            //     switch (peerConnection.connectionState) {
-                            //         case "disconnected":
-                            //             remoteStream.getTracks().forEach((track) => {
-                            //                 track.stop();
-                            //             })
-                            //             break;
-                            //         case "failed":
-                            //             remoteStream.getTracks().forEach((track) => {
-                            //                 console.log(remoteStream);
-                            //                 remoteStream.removeTrack(track);
-                            //             })
-                            //             break;
-
-                            //         default:
-                            //             break;
-                            //     }
-                            // }
+                            peerConnection.onconnectionstatechange = (event) => {
+                                switch (peerConnection.connectionState) {
+                                    case "disconnected":
+                                        console.log("disconnected");
+                                        remoteStream.getTracks().forEach((track) => {
+                                            track.stop();
+                                        })
+                                        break;
+                                    case "failed":
+                                        console.log("failed");
+                                        remoteStream.getTracks().forEach((track) => {
+                                            remoteStream.removeTrack(track);
+                                            setRemoteStreams((remoteStreams) => {
+                                                return remoteStreams.filter((streamItem) =>
+                                                    streamItem.id != remoteStream.id
+                                                );
+                                            }
+                                            );
+                                        })
+                                        break;
+                                    case "closed":
+                                        console.log("closed");
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
 
 
                         }
                         if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid && connectionData.answer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0) {
                             console.log("peer answer", connectionData.memberOfferID);
                             const peerConnection = new RTCPeerConnection(configuration);
+                            setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
                             const remoteStream = new MediaStream();
-                            const indexStream = remoteStreams.length;
-
 
                             if (localStream) {
                                 // console.log("add localStream");
@@ -315,8 +344,9 @@ const Room = (props) => {
                             }
 
                             connectionRef.doc.ref.onSnapshot(async (doc) => {
-                                if (!doc.data().answer && doc.data().offer) {
-                                    const offer = doc.data().offer;
+                                const data = doc.data();
+                                if (!data.answer && data.offer) {
+                                    const offer = data.offer;
                                     // console.log("setRemoteDescription");
                                     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                                     const answer = await peerConnection.createAnswer();
@@ -342,6 +372,10 @@ const Room = (props) => {
                                         });
                                     });
                                 }
+
+                                if (data.isClosed == true) {
+                                    console.log('tat connection');
+                                }
                             });
 
                             let saveStreamID = null;
@@ -349,10 +383,13 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
+                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
+                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
+                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -361,24 +398,33 @@ const Room = (props) => {
                                 }
                             };
 
-                            // peerConnection.onconnectionstatechange = (event) => {
-                            //     switch (peerConnection.connectionState) {
-                            //         case "disconnected":
-                            //             remoteStream.getTracks().forEach((track) => {
-                            //                 track.stop();
-                            //             })
-                            //             break;
-                            //         case "failed":
-                            //             remoteStream.getTracks().forEach((track) => {
-                            //                 console.log(remoteStream);
-                            //                 remoteStream.removeTrack(track);
-                            //             })
-                            //             break;
-
-                            //         default:
-                            //             break;
-                            //     }
-                            // }
+                            peerConnection.onconnectionstatechange = (event) => {
+                                switch (peerConnection.connectionState) {
+                                    case "disconnected":
+                                        console.log("disconnected");
+                                        remoteStream.getTracks().forEach((track) => {
+                                            track.stop();
+                                        })
+                                        break;
+                                    case "failed":
+                                        console.log("failed");
+                                        remoteStream.getTracks().forEach((track) => {
+                                            remoteStream.removeTrack(track);
+                                            setRemoteStreams((remoteStreams) => {
+                                                return remoteStreams.filter((streamItem) =>
+                                                    streamItem.id != remoteStream.id
+                                                );
+                                            }
+                                            );
+                                        })
+                                        break;
+                                    case "closed":
+                                        console.log("closed");
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
 
 
                         }
@@ -404,280 +450,6 @@ const Room = (props) => {
         setRoomJoined();
         return;
     }, [userRef]);
-
-    // useEffect(() => {
-    //     if (localStream) document.querySelector('video#localVideo').srcObject = localStream;
-    // }, [localStream]);
-
-    // useEffect(() => {
-    //     console.log("thay doi remote" + remoteStream.getTracks().length);
-    //     if (remoteStream.getTracks().length) document.querySelector('video#remoteVideo').srcObject = remoteStream;
-    // }, [remoteStream]);
-
-    const addTrackToPeer = (stream, peer) => {
-        stream.getTracks().forEach(track => {
-            peer.addTrack(track, stream);
-        });
-    }
-
-    const createRoom = async () => {
-        const userStream = (await navigator.mediaDevices.getUserMedia(constraints));
-        setLocalStream(await navigator.mediaDevices.getUserMedia(constraints));
-        //tạo phòng trên database
-        const roomRef = database.collection("rooms").doc();
-        const messagesRef = roomRef.collection('messages');
-        setMessagesRef(messagesRef);
-        setQuery(messagesRef.orderBy('createdAt').limit(25));
-
-        setRoom(roomRef.id);
-        //tạo mới member
-        const localMemberRef = await roomRef.collection('members').doc();
-        await localMemberRef.set(
-            {
-                memberID: user.uid,
-                memberTimeJoin: newTimestamp,
-            }
-        );
-        //lấy data member vừa tạo
-        let localMember = (await localMemberRef.get()).data();
-        //tạo conn khi có người vào phòng
-        roomRef.collection('members').onSnapshot((doc) => {
-            doc.docChanges().forEach(async (change) => {
-                let memberChange = change.doc.data();
-                if (change.type === 'added') {
-                    let existsPeerConnection = await roomRef.collection('peerConnections')
-                        .where('memberOfferID', '==', localMember.memberID)
-                        .where('memberAnswerID', '==', memberChange.memberID)
-                        .get();
-                    if (localMember.memberTimeJoin - memberChange.memberTimeJoin < 0) {
-                        console.log(memberChange.memberID);
-                        roomRef.collection('peerConnections').doc().set(
-                            {
-                                memberOfferID: localMember.memberID,
-                                memberAnswerID: memberChange.memberID
-                            }
-                        );
-                    }
-                }
-            })
-        });
-
-
-        //tạo peer2peer khi nó connect mới
-        roomRef.collection('peerConnections').onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach(async (connectionRef) => {
-                let connectionData = connectionRef.doc.data();
-                //đọc thông tin connect cần tạo
-                if (connectionRef.type === 'added' && connectionData.memberOfferID == user.uid) {
-                    console.log("add peerConnections");
-
-                    let tempConnections = localConnections;
-                    tempConnections.push(connectionData);
-                    setLocalConnections(tempConnections);
-
-                    const peerConnection = new RTCPeerConnection(configuration);
-                    const remoteStream = new MediaStream();
-                    document.querySelector('video#remoteVideo').srcObject = remoteStream;
-                    userStream.getTracks().forEach(track => {
-                        peerConnection.addTrack(track, userStream);
-                    });
-
-                    peerConnection.onicecandidate = (event) => {
-                        if (!event.candidate) {
-                            console.log("Got Final Candidate!");
-                            return;
-                        }
-                        console.log('Got candidate: ', event.candidate);
-                        connectionRef.doc.ref.collection("callerCandidates").add(event.candidate.toJSON());
-                    }
-
-                    const offer = await peerConnection.createOffer();
-                    const roomWithOffer = {
-                        offer: {
-                            type: offer.type,
-                            sdp: offer.sdp
-                        }
-                    }
-                    //đặt localdescription
-                    await peerConnection.setLocalDescription(offer);
-
-                    //cập nhật lại room
-                    await connectionRef.doc.ref.update(roomWithOffer);
-
-                    connectionRef.doc.ref.onSnapshot(async doc => {
-                        const data = doc.data();
-                        if (!peerConnection.currentRemoteDescription && data && data.answer) {
-                            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        }
-                    });
-
-                    connectionRef.doc.ref.collection('calleeCandidates').onSnapshot(doc => {
-                        doc.docChanges().forEach(async change => {
-                            if (change.type === 'added') {
-                                console.log("addIceCandidate");
-                                try {
-                                    await peerConnection.addIceCandidate(change.doc.data());
-                                } catch (error) {
-                                    console.log(error);
-                                }
-
-                            }
-                        });
-                    });
-
-                    peerConnection.ontrack = (event) => {
-                        event.streams[0].getTracks().forEach(track => {
-                            remoteStream.addTrack(track);
-                        });
-                    };
-
-                    peerConnection.onconnectionstatechange = (event) => {
-                        switch (peerConnection.connectionState) {
-                            case "disconnected":
-                                remoteStream.getTracks().forEach((track) => {
-                                    track.stop();
-                                })
-                                break;
-                            case "failed":
-                                remoteStream.getTracks().forEach((track) => {
-                                    console.log(remoteStream);
-                                    remoteStream.removeTrack(track);
-                                })
-                                break;
-
-                            default:
-                                break;
-                        }
-                    }
-                }
-            })
-        });
-    };
-    const joinRoom = async (roomId) => {
-        const userStream = (await navigator.mediaDevices.getUserMedia(constraints));
-        setLocalStream(userStream);
-        const roomRef = database.collection('rooms').doc(roomId);
-        setRoom(roomRef.id);
-
-        const messagesRef = roomRef.collection('messages');
-        setMessagesRef(messagesRef);
-        setQuery(messagesRef.orderBy('createdAt').limit(25));
-
-        const localMemberRef = await roomRef.collection('members').doc()
-        await localMemberRef.set(
-            {
-                memberID: user.uid,
-                memberTimeJoin: newTimestamp,
-            }
-        );
-
-        let localMember = (await localMemberRef.get()).data();
-
-        //tạo conn khi có người vào phòng
-        roomRef.collection('members').onSnapshot((doc) => {
-            doc.docChanges().forEach(async (change) => {
-                let memberChange = change.doc.data();
-                if (change.type === 'added') {
-                    let existsPeerConnection = await roomRef.collection('peerConnections')
-                        .where('memberOfferID', '==', localMember.memberID)
-                        .where('memberAnswerID', '==', memberChange.memberID)
-                        .get();
-                    if (localMember.memberTimeJoin - memberChange.memberTimeJoin < 0) {
-                        console.log(memberChange.memberID);
-                        roomRef.collection('peerConnections').doc().set(
-                            {
-                                memberOfferID: localMember.memberID,
-                                memberAnswerID: memberChange.memberID
-                            }
-                        );
-                    }
-                }
-            })
-        });
-
-        roomRef.collection('peerConnections').onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach(async (connectionRef) => {
-                let connectionData = connectionRef.doc.data();
-                if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid) {
-                    console.log("add peerConnections");
-
-                    let tempConnections = localConnections;
-                    tempConnections.push(connectionData);
-                    setLocalConnections(tempConnections);
-
-                    const peerConnection = new RTCPeerConnection(configuration);
-                    const remoteStream = new MediaStream();
-                    document.querySelector('video#remoteVideo').srcObject = remoteStream;
-
-                    userStream.getTracks().forEach(track => {
-                        peerConnection.addTrack(track, userStream);
-                    });
-
-                    peerConnection.onicecandidate = (event) => {
-                        if (!event.candidate) {
-                            console.log("Got Final Candidate!");
-                            return;
-                        }
-                        console.log('Got candidate: ', event.candidate);
-                        connectionRef.doc.ref.collection("calleeCandidates").add(event.candidate.toJSON());
-                    }
-
-                    connectionRef.doc.ref.onSnapshot(async (doc) => {
-                        console.log("connectionRef CHANGE")
-                        if (!doc.data().answer && doc.data().offer) {
-                            const offer = doc.data().offer;
-                            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                            const answer = await peerConnection.createAnswer();
-                            await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
-
-                            const roomWithAnswer = {
-                                answer: {
-                                    type: answer.type,
-                                    sdp: answer.sdp,
-                                },
-                            };
-                            await doc.ref.update(roomWithAnswer);
-
-                            connectionRef.doc.ref.collection('callerCandidates').onSnapshot(snapshot => {
-                                snapshot.docChanges().forEach(async changeIceCandidate => {
-                                    if (changeIceCandidate.type === 'added') {
-                                        console.log("addIceCandidate");
-                                        await peerConnection.addIceCandidate(changeIceCandidate.doc.data());
-                                    }
-                                    console.log("addIceCandidate");
-                                });
-                            });
-                        }
-                    })
-
-                    peerConnection.ontrack = (event) => {
-                        event.streams[0].getTracks().forEach(track => {
-                            remoteStream.addTrack(track);
-                        });
-                    };
-
-                    peerConnection.onconnectionstatechange = (event) => {
-                        switch (peerConnection.connectionState) {
-                            case "disconnected":
-                                remoteStream.getTracks().forEach((track) => {
-                                    track.stop();
-                                })
-                                break;
-                            case "failed":
-                                remoteStream.getTracks().forEach((track) => {
-                                    console.log(remoteStream);
-                                    remoteStream.removeTrack(track);
-                                })
-                                break;
-
-                            default:
-                                break;
-                        }
-                    }
-                }
-            })
-        });
-    };
 
     const handleAddMessage = async (e, message) => {
         e.preventDefault();

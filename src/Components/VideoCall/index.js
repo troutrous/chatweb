@@ -59,9 +59,9 @@ export default function VideoCall(props) {
     useEffect(() => {
         if (remoteStreams) {
             remoteStreams.forEach((remoteStream, index) => {
+                console.log(remoteStream.id);
                 if (remoteStream) {
-                    document.querySelector('video#remoteStream' + index).srcObject = remoteStream;
-                    // console.log("cập nhật lại remoteStream", index);
+                    document.querySelector(`video#remoteStream` + remoteStream.id).srcObject = remoteStream;
                 }
             })
         };
@@ -76,9 +76,11 @@ export default function VideoCall(props) {
             }
             {
                 remoteStreams.map((remoteStream, index) => {
-                    return (
-                        <video className="bg-dark" id={"remoteStream" + index} key={index} autoPlay playsInline controls={false} />
-                    );
+                    if (remoteStream) {
+                        return (
+                            <video className="bg-dark" id={`remoteStream` + remoteStream.id} key={index} autoPlay playsInline controls={false} />
+                        );
+                    }
                 })
             }
         </div>
