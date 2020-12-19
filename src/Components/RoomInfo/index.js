@@ -8,15 +8,17 @@ import { useHistory } from 'react-router-dom';
 export default function RoomInfo(props) {
     const { user } = props;
     const { roomid } = props;
-    const {setOffMembers} = props;
+    const { setOffMembers } = props;
+    const { closeConnections } = props;
     const history = useHistory();
     const handleGotoRoom = useCallback((roomId) => history.replace('/profile'), [history]);
 
     const handleBackToProfile = () => {
-        handleGotoRoom();
-        setOffMembers();
+        setOffMembers().then(() => {
+            closeConnections();
+            handleGotoRoom();
+        })
     }
-    
     return (
         <div className="roominfoContainer">
             <Button variant="danger" type="button" className="btn w-100" onClick={handleBackToProfile}>

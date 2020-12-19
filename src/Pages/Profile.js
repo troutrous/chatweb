@@ -35,7 +35,7 @@ const getCurrentToken = async () => {
 const Profile = (props) => {
     const history = useHistory();
     const handleGotoSign = useCallback(() => history.replace('/sign'), [history]);
-    const handleGotoRoom = useCallback((roomId) => history.push('/room/' + roomId), [history]);
+    const handleGotoRoom = useCallback((roomId) => history.replace('/room/' + roomId), [history]);
     const [user, setUser] = useState(null);
     const [userRef, setUserRef] = useState();
     const [roomCreate, setRoomCreate] = useState('');

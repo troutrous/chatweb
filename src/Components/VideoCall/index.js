@@ -78,7 +78,9 @@ export default function VideoCall(props) {
                 remoteStreams.map((remoteStream, index) => {
                     if (remoteStream) {
                         return (
-                            <video className="bg-dark" id={`remoteStream` + remoteStream.id} key={index} autoPlay playsInline controls={false} />
+                            <div className="videoDiv" key={index}>
+                                <video className="bg-dark" id={`remoteStream` + remoteStream.id} autoPlay playsInline controls={false} />
+                            </div>
                         );
                     }
                 })

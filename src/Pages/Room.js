@@ -101,6 +101,8 @@ const Room = (props) => {
             .finally(() => {
                 setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
                 setRoomRef(roomCollectionRef.doc(roomIDParam));
+                setQuery(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
+                setMessagesRef(roomCollectionRef.doc(roomIDParam).collection('messages'));
             })
         return () => {
             if (tempLocalStream) {
@@ -114,9 +116,15 @@ const Room = (props) => {
         };
     }, []);
 
+    const closeConnections = () => {
+        peerConnections.forEach(connection => {
+            connection.close();
+        })
+    }
+
     useEffect(() => {
-        console.log(peerConnections.length);
-    }, [peerConnections])
+
+    }, [query])
 
     const setOffMembers = async () => {
         if (!roomRef) return;
@@ -472,7 +480,7 @@ const Room = (props) => {
                             <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
-                            <RoomInfo user={user} roomid={roomRef.id} setOffMembers={setOffMembers} />
+                            <RoomInfo user={user} roomid={roomRef.id} setOffMembers={setOffMembers} closeConnections={closeConnections}/>
                         </Col>
                     </Row>
                 )

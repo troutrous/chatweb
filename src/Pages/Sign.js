@@ -7,16 +7,21 @@ import { getCookie, setCookie } from '../Commons/Cookie'
 
 const Sign = (props) => {
     const [signType, setSignType] = useState('Signin');
+
     const [emailSignin, setEmailSignin] = useState('');
     const [emailSignup, setEmailSignup] = useState('');
+
     const [passwordSignin, setPasswordSignin] = useState('');
     const [passwordSignup, setPasswordSignup] = useState('');
+
     const [nameSignup, setNameSignup] = useState('');
     const [phoneSignup, setPhoneSignup] = useState('');
-    const [user, setUser] = useState(sessionStorage.getItem('user'));
+
+    const [renderFlag, setRenderFlag] = useState(false);
 
     const history = useHistory();
-    const handleGotoProfile = useCallback(() => history.push('/profile'), [history]);
+    const handleGotoProfile = useCallback(() => history.replace('/profile'), [history]);
+
     const handleChangeSignType = () => {
         signType == "Signin" ? setSignType("Signup") : setSignType("Signin");
     }
@@ -45,13 +50,12 @@ const Sign = (props) => {
             await app.auth().createUserWithEmailAndPassword(emailSignup, passwordSignup);
             const currentUser = app.auth().currentUser;
             await currentUser.updateProfile({
-                displayName:nameSignup,
+                displayName: nameSignup,
                 phoneNumber: phoneSignup
             })
             const token = await getCurrentToken();
             if (token) {
                 setCookie('userToken', token);
-                setUser(currentUser);
                 handleGotoProfile();
             }
         } catch (error) {
@@ -87,24 +91,15 @@ const Sign = (props) => {
         if (userToken) {
             getCurrentToken()
                 .then((token) => {
-                    setCookie('userToken', token);
-                    setUser(app.auth().currentUser);
+                    handleGotoProfile();
                 })
-                .catch((err) => console.log(err));
+                .catch((err) => {
+                    console.log(err);
+                    setRenderFlag(true);
+                });
         }
         return;
     }, []);
-
-
-    const handleSignOut = async () => {
-        try {
-            await app.auth().signOut();
-            setUser(null);
-            setCookie('userToken', null);
-        } catch (error) {
-            console.log(error);
-        }
-    }
     const handleSignIn = async (event) => {
         event.preventDefault();
         try {
@@ -123,7 +118,6 @@ const Sign = (props) => {
                     });
                 }
                 setCookie('userToken', token);
-                setUser(currentUser);
                 handleGotoProfile();
             }
         } catch (error) {
@@ -148,7 +142,6 @@ const Sign = (props) => {
                 });
             }
             setCookie('userToken', token);
-            setUser(currentUser);
             handleGotoProfile();
         } catch (error) {
             // The email of the user's account used.
@@ -159,70 +152,77 @@ const Sign = (props) => {
         }
     }
     return (
-        <Container className="d-flex flex-column justify-content-center pt-5">
+        <Container className="h-100 w-100" >
             {
-                signType == 'Signin' && (
-                    <Form>
-                        <Form.Group controlId="formBasicEmail">
-                            <Form.Label>Email address</Form.Label>
-                            <Form.Control type="email" placeholder="Enter email" value={emailSignin} onChange={handleOnEmailSigninChange} />
-                            <Form.Text className="text-muted">We'll never share your email wiYth anyone else.</Form.Text>
-                        </Form.Group>
+                renderFlag && (
+                    <Container className="d-flex flex-column justify-content-center pt-5">
+                        {
+                            signType == 'Signin' && (
+                                <Form>
+                                    <Form.Group controlId="formBasicEmail">
+                                        <Form.Label>Email address</Form.Label>
+                                        <Form.Control type="email" placeholder="Enter email" value={emailSignin} onChange={handleOnEmailSigninChange} />
+                                        <Form.Text className="text-muted">We'll never share your email wiYth anyone else.</Form.Text>
+                                    </Form.Group>
 
-                        <Form.Group controlId="formBasicPassword">
-                            <Form.Label>Email address</Form.Label>
-                            <Form.Control type="password" placeholder="Enter password" value={passwordSignin} onChange={handleOnPasswordSigninChange} />
-                        </Form.Group>
+                                    <Form.Group controlId="formBasicPassword">
+                                        <Form.Label>Email address</Form.Label>
+                                        <Form.Control type="password" placeholder="Enter password" value={passwordSignin} onChange={handleOnPasswordSigninChange} />
+                                    </Form.Group>
 
-                        <Form.Group className="d-flex justify-content-center">
-                            <Button variant="info" type="submit" className="w-100" onClick={handleSignIn}>Sign in</Button>
-                        </Form.Group>
-                        <Alert variant='info' className="d-flex justify-content-between">
-                            Don't have an account?
+                                    <Form.Group className="d-flex justify-content-center">
+                                        <Button variant="info" type="submit" className="w-100" onClick={handleSignIn}>Sign in</Button>
+                                    </Form.Group>
+                                    <Alert variant='info' className="d-flex justify-content-between">
+                                        Don't have an account?
                             <Button variant="info" type="button" onClick={() => handleChangeSignType()}>Sign up</Button>
-                        </Alert>
-                        <Form.Group className="d-flex justify-content-center">
-                            <Alert variant='info w-100 d-flex justify-content-center'>
-                                <Button variant="light" type="button" className="w-50" onClick={handleSignInWithGoogle}>
-                                    <img src="https://img.icons8.com/color/30/000000/google-logo.png" className="mr-2" />
+                                    </Alert>
+                                    <Form.Group className="d-flex justify-content-center">
+                                        <Alert variant='info w-100 d-flex justify-content-center'>
+                                            <Button variant="light" type="button" className="w-50" onClick={handleSignInWithGoogle}>
+                                                <img src="https://img.icons8.com/color/30/000000/google-logo.png" className="mr-2" />
                                 Sign in with Google</Button>
-                            </Alert>
-                        </Form.Group>
-                    </Form>
-                ) || (
-                    <Form>
-                        <Form.Row className="w-100">
-                            <Form.Group as={Col} controlId="formGridEmail" className="pl-0">
-                                <Form.Label>Email</Form.Label>
-                                <Form.Control type="email" placeholder="Your email" value={emailSignup} onChange={handleOnEmailSignupChange} />
-                            </Form.Group>
+                                        </Alert>
+                                    </Form.Group>
+                                </Form>
+                            ) || (
+                                <Form>
+                                    <Form.Row className="w-100">
+                                        <Form.Group as={Col} controlId="formGridEmail" className="pl-0">
+                                            <Form.Label>Email</Form.Label>
+                                            <Form.Control type="email" placeholder="Your email" value={emailSignup} onChange={handleOnEmailSignupChange} />
+                                        </Form.Group>
 
-                            <Form.Group as={Col} controlId="formGridPassword" className="pr-0">
-                                <Form.Label>Password</Form.Label>
-                                <Form.Control type="password" placeholder="Your password" value={passwordSignup} onChange={handleOnPasswordSignupChange} />
-                            </Form.Group>
-                        </Form.Row>
-                        <Form.Row className="w-100">
-                            <Form.Group as={Col} controlId="formGridName1" className="px-0">
-                                <Form.Label>Full Name</Form.Label>
-                                <Form.Control placeholder="Your name" type="name" value={nameSignup} onChange={handleOnNameSignupChange} />
-                            </Form.Group>
-                        </Form.Row>
-                        <Form.Row className="w-100">
-                            <Form.Group as={Col} controlId="formGridPhone1" className="px-0">
-                                <Form.Label>Phone nunber</Form.Label>
-                                <Form.Control placeholder="Your phone" type="phone" value={phoneSignup} onChange={handleOnPhoneSignupChange} />
-                            </Form.Group>
-                        </Form.Row>
-                        <Form.Row className="d-flex justify-content-between w-100">
-                            <Button type="button" variant="danger" onClick={handleChangeSignType}>Back</Button>
-                            <Button variant="info" type="submit" onClick={handleSignUp}>Sign up</Button>
-                        </Form.Row>
-                    </Form>
+                                        <Form.Group as={Col} controlId="formGridPassword" className="pr-0">
+                                            <Form.Label>Password</Form.Label>
+                                            <Form.Control type="password" placeholder="Your password" value={passwordSignup} onChange={handleOnPasswordSignupChange} />
+                                        </Form.Group>
+                                    </Form.Row>
+                                    <Form.Row className="w-100">
+                                        <Form.Group as={Col} controlId="formGridName1" className="px-0">
+                                            <Form.Label>Full Name</Form.Label>
+                                            <Form.Control placeholder="Your name" type="name" value={nameSignup} onChange={handleOnNameSignupChange} />
+                                        </Form.Group>
+                                    </Form.Row>
+                                    <Form.Row className="w-100">
+                                        <Form.Group as={Col} controlId="formGridPhone1" className="px-0">
+                                            <Form.Label>Phone nunber</Form.Label>
+                                            <Form.Control placeholder="Your phone" type="phone" value={phoneSignup} onChange={handleOnPhoneSignupChange} />
+                                        </Form.Group>
+                                    </Form.Row>
+                                    <Form.Row className="d-flex justify-content-between w-100">
+                                        <Button type="button" variant="danger" onClick={handleChangeSignType}>Back</Button>
+                                        <Button variant="info" type="submit" onClick={handleSignUp}>Sign up</Button>
+                                    </Form.Row>
+                                </Form>
+                            )
+                        }
+                    </Container>
                 )
-            }
-            {
-                user && <Button variant="danger" type="button" onClick={handleSignOut}>Sign out</Button>
+
+
+
+
             }
         </Container>
     );
