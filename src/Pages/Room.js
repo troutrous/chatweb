@@ -48,16 +48,21 @@ const Room = (props) => {
 
     const [query, setQuery] = useState(null);
     const [messagesRef, setMessagesRef] = useState(null);
+    const [query1, setQuery1] = useState(null);
+    const [membersRef, setMembersRef] = useState(null);
 
     const [peerConnections, setPeerConnections] = useState([]);
 
     const [messages] = useCollectionData(query, { idField: 'id' });
+    const [members] = useCollectionData(query1, { idField: 'id' });
+
+
     const history = useHistory();
     const handleGotoSign = useCallback(() => history.replace('/sign'), [history]);
 
     const getCurrentToken = async () => {
-        const currentUser = app.auth().currentUser;
-        if (currentUser) return currentUser;
+        const currentUser = await app.auth().currentUser;
+        if (currentUser) return await currentUser.getIdToken();
         return new Promise((resolve, reject) => {
             const waiting = setTimeout(() => {
                 reject(new Error('Het thoi gian cho :('));
@@ -103,6 +108,8 @@ const Room = (props) => {
                 setRoomRef(roomCollectionRef.doc(roomIDParam));
                 setQuery(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
                 setMessagesRef(roomCollectionRef.doc(roomIDParam).collection('messages'));
+                setQuery1(roomCollectionRef.doc(roomIDParam).collection('members').orderBy('memberTimeJoin', 'asc'));
+                setMembersRef(roomCollectionRef.doc(roomIDParam).collection('members'));
             })
         return () => {
             if (tempLocalStream) {
@@ -110,9 +117,6 @@ const Room = (props) => {
                     track.stop();
                 });
             }
-            setLocalStream(null);
-            setUserRef(null);
-            setRoomRef(null);
         };
     }, []);
 
@@ -121,10 +125,6 @@ const Room = (props) => {
             connection.close();
         })
     }
-
-    useEffect(() => {
-
-    }, [query])
 
     const setOffMembers = async () => {
         if (!roomRef) return;
@@ -181,6 +181,7 @@ const Room = (props) => {
                         memberID: user.uid,
                         memberTimeJoin: newTimestamp,
                         memberStatus: true,
+                        memberEmail: user.email
                     });
                 }
             })
@@ -461,11 +462,13 @@ const Room = (props) => {
 
     const handleAddMessage = async (e, message) => {
         e.preventDefault();
-        messagesRef.add({
-            text: message,
-            createdAt: newTimestamp,
-            userid: user.uid,
-        });
+        if (message) {
+            messagesRef.add({
+                text: message,
+                createdAt: newTimestamp,
+                userid: user.uid,
+            });
+        }
     }
 
     return (
@@ -480,7 +483,7 @@ const Room = (props) => {
                             <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
-                            <RoomInfo user={user} roomid={roomRef.id} setOffMembers={setOffMembers} closeConnections={closeConnections}/>
+                            <RoomInfo user={user} roomid={roomRef.id} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} />
                         </Col>
                     </Row>
                 )

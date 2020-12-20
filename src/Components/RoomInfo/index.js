@@ -10,6 +10,7 @@ export default function RoomInfo(props) {
     const { roomid } = props;
     const { setOffMembers } = props;
     const { closeConnections } = props;
+    const { members } = props;
     const history = useHistory();
     const handleGotoRoom = useCallback((roomId) => history.replace('/profile'), [history]);
 
@@ -36,6 +37,18 @@ export default function RoomInfo(props) {
                 <h6>Room</h6>
                 <h6>{roomid}</h6>
             </Alert>
+            {
+                members && (
+                    <Alert variant='info text-center'>
+                        <h6>Members</h6>
+                        {
+                            members.map((member, index) => {
+                                return (<p key={"member" + index}>{member.memberEmail}</p>)
+                            })
+                        }
+                    </Alert>
+                )
+            }
         </div>
     );
 }
