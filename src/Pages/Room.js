@@ -86,30 +86,42 @@ const Room = (props) => {
     useEffect(() => {
         const userToken = getCookie('userToken');
         let tempLocalStream;
+        let erorFlag = false;
         if (!userToken) { handleGotoSign(); return; }
         getCurrentToken()
             .then((token) => {
                 setCookie('userToken', token);
                 setUser(app.auth().currentUser);
-                return navigator.mediaDevices.getUserMedia(constraints);
+                return roomCollectionRef.doc(roomIDParam).get();
+            })
+            .then((roomExists) => {
+                if (roomExists.exists) {
+                    return navigator.mediaDevices.getUserMedia(constraints);
+                } else {
+                    alert("Phòng không hợp lệ");
+                    handleGotoSign();
+                    erorFlag = true;
+                    throw new Error("No room");
+                }
             })
             .then((stream) => {
                 console.log("add localStream");
                 tempLocalStream = stream;
                 setLocalStream(stream);
-
             })
             .catch((err) => {
-                // handleGotoSign();
                 console.log(err.message);
             })
             .finally(() => {
-                setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
-                setRoomRef(roomCollectionRef.doc(roomIDParam));
-                setQuery(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
-                setMessagesRef(roomCollectionRef.doc(roomIDParam).collection('messages'));
-                setQuery1(roomCollectionRef.doc(roomIDParam).collection('members').orderBy('memberTimeJoin', 'asc'));
-                setMembersRef(roomCollectionRef.doc(roomIDParam).collection('members'));
+                if (!erorFlag) {
+                    console.log("hahaha");
+                    setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
+                    setRoomRef(roomCollectionRef.doc(roomIDParam));
+                    setQuery(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
+                    setMessagesRef(roomCollectionRef.doc(roomIDParam).collection('messages'));
+                    setQuery1(roomCollectionRef.doc(roomIDParam).collection('members').orderBy('memberTimeJoin', 'asc'));
+                    setMembersRef(roomCollectionRef.doc(roomIDParam).collection('members'));
+                }
             })
         return () => {
             if (tempLocalStream) {

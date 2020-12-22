@@ -55,6 +55,16 @@ const Sign = (props) => {
             })
             const token = await getCurrentToken();
             if (token) {
+                const currentUser = app.auth().currentUser;
+                const userData = await database.collection('users').doc(currentUser.uid).get();
+                if (!userData.exists) {
+                    console.log('userDatanotexist')
+                    await database.collection('users').doc(currentUser.uid).set({
+                        userName: currentUser.displayName,
+                        userEmail: currentUser.email,
+                        userPhotoURL: currentUser.photoURL
+                    });
+                }
                 setCookie('userToken', token);
                 handleGotoProfile();
             }
@@ -88,11 +98,9 @@ const Sign = (props) => {
 
     useEffect(() => {
         const userToken = getCookie('userToken');
-        console.log("1");
         if (userToken) {
             getCurrentToken()
                 .then((token) => {
-                    console.log(token);
                     handleGotoProfile();
                 })
                 .catch((err) => {
@@ -117,7 +125,6 @@ const Sign = (props) => {
                     await database.collection('users').doc(currentUser.uid).set({
                         userName: currentUser.displayName,
                         userEmail: currentUser.email,
-                        userPhoneNumber: currentUser.phoneNumber,
                         userPhotoURL: currentUser.photoURL
                     });
                 }
@@ -137,11 +144,10 @@ const Sign = (props) => {
             const currentUser = app.auth().currentUser;
             const userData = await database.collection('users').doc(currentUser.uid).get();
             if (!userData.exists) {
-                console.log('userDatanotexist')
+                console.log(currentUser);
                 await database.collection('users').doc(currentUser.uid).set({
                     userName: currentUser.displayName,
                     userEmail: currentUser.email,
-                    userPhoneNumber: currentUser.phoneNumber,
                     userPhotoURL: currentUser.photoURL
                 });
             }

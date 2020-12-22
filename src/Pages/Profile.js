@@ -112,15 +112,25 @@ const Profile = (props) => {
             setRoomCreate('');
             handleGotoRoom(newRoomRef.id);
         } catch (error) {
-
+            console.log(error);
         }
     }
 
     const handleJoinRoomWithID = async (e) => {
         e.preventDefault();
         if (!roomJoin) return;
-        setRoomJoin('');
-        handleGotoRoom(roomJoin);
+        try {
+            const roomExists = await roomCollectionRef.doc(roomJoin).get();
+            if(roomExists.exists){
+                setRoomJoin('');
+                handleGotoRoom(roomJoin);
+            } else {
+                alert("Mã phòng không hợp lệ");
+            }
+        } catch (error) {
+            console.log(error);
+        }
+        
     }
 
     const handleSignOut = async () => {
