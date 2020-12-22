@@ -13,7 +13,9 @@ var firebaseConfig = {
     measurementId: "G-HB3YXFX8HM"
 };
 
-export const provider = new firebase.auth.GoogleAuthProvider();
+export const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+export const emailProvider = firebase.auth.EmailAuthProvider;
 
 export const app = firebase.initializeApp(firebaseConfig);
 

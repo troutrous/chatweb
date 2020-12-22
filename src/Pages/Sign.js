@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Button, Container, Form, Col, Row } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useHistory } from 'react-router-dom';
-import { provider, app, database } from '../firebase';
+import { googleProvider, app, database } from '../firebase';
 import { getCookie, setCookie } from '../Commons/Cookie'
 
 const Sign = (props) => {
@@ -72,6 +72,16 @@ const Sign = (props) => {
             })
             const token = await getCurrentToken();
             if (token) {
+                const currentUser = app.auth().currentUser;
+                const userData = await database.collection('users').doc(currentUser.uid).get();
+                if (!userData.exists) {
+                    console.log('userDatanotexist')
+                    await database.collection('users').doc(currentUser.uid).set({
+                        userName: currentUser.displayName,
+                        userEmail: currentUser.email,
+                        userPhotoURL: currentUser.photoURL
+                    });
+                }
                 setCookie('userToken', token);
                 handleGotoProfile();
             }
@@ -103,8 +113,8 @@ const Sign = (props) => {
     }
 
     const getCurrentToken = async () => {
-        const currentUser = app.auth().currentUser;
-        if (currentUser) return currentUser;
+        const currentUser = await app.auth().currentUser;
+        if (currentUser) return await currentUser.getIdToken();
         return new Promise((resolve, reject) => {
             const waiting = setTimeout(() => {
                 reject(new Error('Het thoi gian cho :('));
@@ -133,9 +143,11 @@ const Sign = (props) => {
                     handleGotoProfile();
                 })
                 .catch((err) => {
-                    console.log(err);
                     setRenderFlag(true);
+                    console.log(err);
                 });
+        } else {
+            setRenderFlag(true);
         }
         return;
     }, []);
@@ -152,7 +164,6 @@ const Sign = (props) => {
                     await database.collection('users').doc(currentUser.uid).set({
                         userName: currentUser.displayName,
                         userEmail: currentUser.email,
-                        userPhoneNumber: currentUser.phoneNumber,
                         userPhotoURL: currentUser.photoURL
                     });
                 }
@@ -166,17 +177,16 @@ const Sign = (props) => {
 
     const handleSignInWithGoogle = async () => {
         try {
-            const result = await app.auth().signInWithPopup(provider)
+            const result = await app.auth().signInWithPopup(googleProvider)
             const token = result.credential.accessToken;
 
             const currentUser = app.auth().currentUser;
             const userData = await database.collection('users').doc(currentUser.uid).get();
             if (!userData.exists) {
-                console.log('userDatanotexist')
+                console.log(currentUser);
                 await database.collection('users').doc(currentUser.uid).set({
                     userName: currentUser.displayName,
                     userEmail: currentUser.email,
-                    userPhoneNumber: currentUser.phoneNumber,
                     userPhotoURL: currentUser.photoURL
                 });
             }
@@ -199,7 +209,7 @@ const Sign = (props) => {
                             signType == 'Signin' && (
                                 <Form>
                                     <Form.Group controlId="formBasicEmail">
-                                        <Form.Label>Email address</Form.Label>
+                                        <Form.Label>Email</Form.Label>
                                         <Form.Control type="email" placeholder="Enter email" value={emailSignin} onChange={handleOnEmailSigninChange} />
                                         <Form.Text className="text-muted">We'll never share your email wiYth anyone else.</Form.Text>
                                     </Form.Group>

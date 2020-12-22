@@ -67,8 +67,6 @@ export default function VideoCall(props) {
         };
     }, [remoteStreams]);
 
-
-
     return (
         <div className="videoCallContainer">
             {
