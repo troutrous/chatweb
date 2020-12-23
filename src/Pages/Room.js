@@ -199,11 +199,22 @@ const Room = (props) => {
             })
             .then(() => {
                 console.log("step2");
+                return membersRef.doc(localMemberRef.id).get();
+            })
+            .then((localMemberRef) => {
+                localMember = localMemberRef.data();
+                if (!localMember.memberTimeJoin) {
+                    return membersRef.doc(localMemberRef.id).get();
+                } else {
+                    return localMemberRef;
+                }
+            })
+            .then((localMemberRef) => {
+                localMember = localMemberRef.data();
                 unsubscribeMembers = roomRef.collection('members').onSnapshot(async (doc) => {
-                    localMember = (await localMemberRef.get()).data();
                     doc.docChanges().forEach(async (change) => {
                         const memberChange = change.doc.data();
-                        if (localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberID != memberChange.memberID) {
+                        if (localMember.memberTimeJoin !=null && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberStatus == true && localMember.memberID != memberChange.memberID) {
                             console.log("create", memberChange.memberID);
                             return roomRef.collection('peerConnections').doc().set(
                                 {
@@ -224,7 +235,7 @@ const Room = (props) => {
                         localMember = (await localMemberRef.get()).data();
                         let offerOptions;
 
-                        if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0) {
+                        if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0 && localMember.memberTimeJoin !=null) {
                             console.log("peer offer", connectionData.memberAnswerID);
                             const peerConnection = new RTCPeerConnection(configuration);
                             setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
@@ -297,13 +308,10 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
-                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
-                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
-                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -314,14 +322,15 @@ const Room = (props) => {
 
                             peerConnection.onconnectionstatechange = (event) => {
                                 switch (peerConnection.connectionState) {
+                                    case "connected":
+                                        console.log("connected");
+                                        break;
                                     case "disconnected":
-                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
                                         })
                                         break;
                                     case "failed":
-                                        console.log("failed");
                                         remoteStream.getTracks().forEach((track) => {
                                             remoteStream.removeTrack(track);
                                             setRemoteStreams((remoteStreams) => {
@@ -333,7 +342,6 @@ const Room = (props) => {
                                         })
                                         break;
                                     case "closed":
-                                        console.log("closed");
                                         break;
                                     default:
                                         break;
@@ -393,10 +401,6 @@ const Room = (props) => {
                                         });
                                     });
                                 }
-
-                                if (data.isClosed == true) {
-                                    console.log('tat connection');
-                                }
                             });
 
                             let saveStreamID = null;
@@ -404,13 +408,10 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
-                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
-                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
-                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -421,14 +422,15 @@ const Room = (props) => {
 
                             peerConnection.onconnectionstatechange = (event) => {
                                 switch (peerConnection.connectionState) {
+                                    case "connected":
+                                        console.log("connected");
+                                        break;
                                     case "disconnected":
-                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
                                         })
                                         break;
                                     case "failed":
-                                        console.log("failed");
                                         remoteStream.getTracks().forEach((track) => {
                                             remoteStream.removeTrack(track);
                                             setRemoteStreams((remoteStreams) => {
@@ -440,7 +442,6 @@ const Room = (props) => {
                                         })
                                         break;
                                     case "closed":
-                                        console.log("closed");
                                         break;
                                     default:
                                         break;
@@ -476,9 +477,11 @@ const Room = (props) => {
         e.preventDefault();
         if (message) {
             messagesRef.add({
-                text: message,
+                messageText: message,
                 createdAt: newTimestamp,
-                userid: user.uid,
+                userID: user.uid,
+                userEmail: user.email,
+                userName: user.displayName
             });
         }
     }

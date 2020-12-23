@@ -59,7 +59,6 @@ export default function VideoCall(props) {
     useEffect(() => {
         if (remoteStreams) {
             remoteStreams.forEach((remoteStream, index) => {
-                console.log(remoteStream.id);
                 if (remoteStream) {
                     document.querySelector(`video#remoteStream` + remoteStream.id).srcObject = remoteStream;
                 }
