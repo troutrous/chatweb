@@ -7,12 +7,16 @@ import { useHistory } from 'react-router-dom';
 
 export default function RoomInfo(props) {
     const { user } = props;
-    const { roomid } = props;
+    const { roomData } = props;
     const { setOffMembers } = props;
     const { closeConnections } = props;
     const { members } = props;
     const history = useHistory();
     const handleGotoRoom = useCallback((roomId) => history.replace('/profile'), [history]);
+
+    useEffect(() => {
+        console.log(roomData);
+    }, [roomData]);
 
     const handleBackToProfile = () => {
         setOffMembers().then(() => {
@@ -35,7 +39,11 @@ export default function RoomInfo(props) {
             </Alert>
             <Alert variant='info text-center'>
                 <h6>Room</h6>
-                <h6>{roomid}</h6>
+                <h6>{roomData?.roomName}</h6>
+            </Alert>
+            <Alert variant='info text-center'>
+                <h6>Leader</h6>
+                <h6>{roomData?.roomLead.displayName}</h6>
             </Alert>
             {
                 members && (
@@ -43,7 +51,7 @@ export default function RoomInfo(props) {
                         <h6>Members</h6>
                         {
                             members.map((member, index) => {
-                                return (<p key={"member" + index}>{member.memberEmail}</p>)
+                                return (<p key={"member" + index}>{member.memberName && member.memberName || member.memberEmail}</p>)
                             })
                         }
                     </Alert>
