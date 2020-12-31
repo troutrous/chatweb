@@ -38,7 +38,8 @@ const Profile = (props) => {
     const handleGotoRoom = useCallback((roomId) => history.replace('/room/' + roomId), [history]);
     const [user, setUser] = useState(null);
     const [userRef, setUserRef] = useState();
-    const [roomCreate, setRoomCreate] = useState('');
+    const [roomNameCreate, setRoomNameCreate] = useState('');
+    const [roomPasswordCreate, setRoomPasswordCreate] = useState('');
     const [roomJoin, setRoomJoin] = useState('');
     const [roomJoined, setRoomJoined] = useState([]);
 
@@ -68,12 +69,15 @@ const Profile = (props) => {
 
     useEffect(() => {
         getRoomJoined();
-        return;
+        return () => {
+
+        };
     }, [userRef]);
 
     const getRoomJoined = async () => {
         if (!userRef) return;
         const roomJoinedSnapshot = await userRef.collection('roomJoined').get();
+        let arrayTemplate = [];
         roomJoinedSnapshot.forEach(async roomJoinedSnap => {
             let memberArray = [];
             const roomInfo = await roomCollectionRef.doc(roomJoinedSnap.id).get();
@@ -82,34 +86,30 @@ const Profile = (props) => {
                 memberArray.push(member.data());
             })
             if (roomInfo.exists) {
-                console.log(memberArray);
-                setRoomJoined(roomJoined => [...roomJoined, { id: roomJoinedSnap.id, ...roomInfo.data(), memberArray }]);
+                arrayTemplate.push({ id: roomJoinedSnap.id, ...roomInfo.data(), memberArray });
+                setRoomJoined(arrayTemplate);
             }
         });
     };
 
-    const handleOnRoomCreateChange = (e) => {
-        setRoomCreate(e.target.value);
-    }
-    const handleOnRoomJoinChange = (e) => {
-        setRoomJoin(e.target.value);
-    }
-
     const handleCreateRoom = async (e) => {
-        if (!roomCreate) {
+        if (!roomNameCreate || !roomPasswordCreate) {
             return;
         }
         try {
             e.preventDefault();
             const newRoomRef = await roomCollectionRef.add({
-                roomName: roomCreate,
-                roomUserCreated: {
+                roomName: roomNameCreate,
+                roomPassword: roomPasswordCreate,
+                roomLead: {
                     uid: user.uid,
-                    email: user.email
+                    email: user.email,
+                    displayName: user.displayName,
                 },
                 roomCreatedAt: new Date(),
             });
-            setRoomCreate('');
+            setRoomNameCreate('');
+            setRoomPasswordCreate('');
             handleGotoRoom(newRoomRef.id);
         } catch (error) {
             console.log(error);
@@ -251,7 +251,7 @@ const Profile = (props) => {
                 (
                     <Row className="row-cols-3 h-100 w-100 overflow-hidden m-0">
                         <Col className="col-4 p-0">
-                            <Alert className="w-100" variant='dark' className="d-flex justify-content-between bg-gradient">
+                            <Alert className="w-100" variant='info' className="d-flex justify-content-between bg-gradient">
                                 <Button variant="danger" onClick={handleSignOut} className="text-light bg-gradient">
                                     <span className="mr-2">Đăng xuất</span>
                                     <svg width="1em" height="1em" viewBox="0 0 16 16" className="bi bi-box-arrow-right" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -290,9 +290,12 @@ const Profile = (props) => {
 
                             <Alert className="w-100" variant='info'>
                                 <Form onSubmit={handleCreateRoom}>
-                                    <label htmlFor="formCreateRoom" className="h5 text-info">Tạo phòng mới</label>
-                                    <Form.Group controlId="formCreateRoom" className="mt-2">
-                                        <Form.Control onSubmit={handleCreateRoom} type="name" placeholder="Tên phòng" value={roomCreate} onChange={handleOnRoomCreateChange} />
+                                    <label htmlFor="formCreateNameRoom" className="h5 text-info">Tạo phòng mới</label>
+                                    <Form.Group controlId="formCreateNameRoom" className="mt-2">
+                                        <Form.Control onSubmit={handleCreateRoom} type="name" placeholder="Tên phòng" value={roomNameCreate} onChange={(e) => setRoomNameCreate(e.target.value)} />
+                                    </Form.Group>
+                                    <Form.Group controlId="formCreatePasswordRoom" className="mt-2">
+                                        <Form.Control type="password" placeholder="Mật khẩu" value={roomPasswordCreate} onChange={(e) => setRoomPasswordCreate(e.target.value)} />
                                     </Form.Group>
                                     <Form.Group className="d-flex justify-content-center">
                                         <Button variant="info" type="button" className="btn w-100 mt-2" onClick={handleCreateRoom}>
@@ -309,7 +312,7 @@ const Profile = (props) => {
                                 <Form onSubmit={handleJoinRoomWithID}>
                                     <label htmlFor="formJoinRoom" className="h5 text-info">Vào phòng</label>
                                     <Form.Group controlId="formJoinRoom" className="mt-2">
-                                        <Form.Control type="name" placeholder="Mã phòng" value={roomJoin} onChange={handleOnRoomJoinChange} />
+                                        <Form.Control type="name" placeholder="Mã phòng" value={roomJoin} onChange={(e) => setRoomJoin(e.target.value)} />
                                     </Form.Group>
                                     <Form.Group className="d-info justify-content-center">
                                         <Button variant="info" type="button" className="btn w-100 mt-2" onClick={handleJoinRoomWithID}>

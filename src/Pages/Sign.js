@@ -63,12 +63,15 @@ const Sign = (props) => {
     }
     const handleSignUp = async (event) => {
         event.preventDefault();
+        if (!emailSignup || !passwordSignup || !nameSignup) {
+            alert("Vui lòng nhập đầy đủ thông tin!");
+            return;
+        }
         try {
             await app.auth().createUserWithEmailAndPassword(emailSignup, passwordSignup);
             const currentUser = app.auth().currentUser;
             await currentUser.updateProfile({
                 displayName: nameSignup,
-                phoneNumber: phoneSignup
             })
             const token = await getCurrentToken();
             if (token) {
@@ -257,12 +260,6 @@ const Sign = (props) => {
                                         <Form.Group as={Col} controlId="formGridName1" className="px-0">
                                             <Form.Label>Full Name</Form.Label>
                                             <Form.Control placeholder="Your name" type="name" value={nameSignup} onChange={handleOnNameSignupChange} />
-                                        </Form.Group>
-                                    </Form.Row>
-                                    <Form.Row className="w-100">
-                                        <Form.Group as={Col} controlId="formGridPhone1" className="px-0">
-                                            <Form.Label>Phone nunber</Form.Label>
-                                            <Form.Control placeholder="Your phone" type="phone" value={phoneSignup} onChange={handleOnPhoneSignupChange} />
                                         </Form.Group>
                                     </Form.Row>
                                     <Form.Row className="d-flex justify-content-between w-100">

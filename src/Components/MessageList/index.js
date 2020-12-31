@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Alert } from 'react-bootstrap';
 import Compose from '../Compose';
 // import Toolbar from '../Toolbar';
 import ToolbarButton from '../ToolbarButton';
@@ -14,7 +15,7 @@ export default function MessageList(props) {
   const {handleAddMessage} = props;
   const {user} = props;
   return (
-    <div className="message-list h-100 w-100">
+    <Alert variant="info" className="message-list h-100 w-100 p-0 m-0">
 
       <div className="message-list-container overflow-auto">
         {
@@ -26,6 +27,6 @@ export default function MessageList(props) {
         }
       </div>
       <Compose handleAddMessage={handleAddMessage}/>
-    </div>
+    </Alert>
   );
 }

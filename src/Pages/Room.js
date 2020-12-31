@@ -43,6 +43,8 @@ const Room = (props) => {
     const [roomRef, setRoomRef] = useState();
     const [userRef, setUserRef] = useState();
 
+    const [roomData, setRoomData] = useState();
+
     const [localStream, setLocalStream] = useState();
     const [remoteStreams, setRemoteStreams] = useState([]);
 
@@ -96,7 +98,23 @@ const Room = (props) => {
             })
             .then((roomExists) => {
                 if (roomExists.exists) {
-                    return navigator.mediaDevices.getUserMedia(constraints);
+                    while (true) {
+                        let password = prompt("Vui lòng nhập mật khẩu để vào phòng");
+                        if (password === roomExists.data().roomPassword) {
+                            setRoomData(roomExists.data());
+                            return navigator.mediaDevices.getUserMedia(constraints);
+                        }
+                        else {
+                            var answer = window.confirm("Rất tiêc! Mật khẩu của bạn chưa đúng! Bạn có muốn nhập lại mật khẩu ??");
+                            if (answer) {
+                            }
+                            else {
+                                handleGotoSign();
+                                erorFlag = true;
+                                throw new Error("Password failed");
+                            }
+                        }
+                    }
                 } else {
                     alert("Phòng không hợp lệ");
                     handleGotoSign();
@@ -162,6 +180,10 @@ const Room = (props) => {
     };
 
     useEffect(() => {
+        console.log(roomData);
+    }, [roomData])
+
+    useEffect(() => {
         if (!roomRef) return null;
 
         let membersRef = roomRef.collection('members');
@@ -193,17 +215,29 @@ const Room = (props) => {
                         memberID: user.uid,
                         memberTimeJoin: newTimestamp,
                         memberStatus: true,
-                        memberEmail: user.email
+                        memberEmail: user.email,
+                        memberName: user.displayName,
                     });
                 }
             })
             .then(() => {
                 console.log("step2");
+                return membersRef.doc(localMemberRef.id).get();
+            })
+            .then((localMemberRef) => {
+                localMember = localMemberRef.data();
+                if (!localMember.memberTimeJoin) {
+                    return membersRef.doc(localMemberRef.id).get();
+                } else {
+                    return localMemberRef;
+                }
+            })
+            .then((localMemberRef) => {
+                localMember = localMemberRef.data();
                 unsubscribeMembers = roomRef.collection('members').onSnapshot(async (doc) => {
-                    localMember = (await localMemberRef.get()).data();
                     doc.docChanges().forEach(async (change) => {
                         const memberChange = change.doc.data();
-                        if (localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberID != memberChange.memberID) {
+                        if (localMember.memberTimeJoin != null && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberStatus == true && localMember.memberID != memberChange.memberID) {
                             console.log("create", memberChange.memberID);
                             return roomRef.collection('peerConnections').doc().set(
                                 {
@@ -224,7 +258,7 @@ const Room = (props) => {
                         localMember = (await localMemberRef.get()).data();
                         let offerOptions;
 
-                        if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0) {
+                        if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0 && localMember.memberTimeJoin != null) {
                             console.log("peer offer", connectionData.memberAnswerID);
                             const peerConnection = new RTCPeerConnection(configuration);
                             setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
@@ -297,13 +331,10 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
-                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
-                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
-                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -314,14 +345,15 @@ const Room = (props) => {
 
                             peerConnection.onconnectionstatechange = (event) => {
                                 switch (peerConnection.connectionState) {
+                                    case "connected":
+                                        console.log("connected");
+                                        break;
                                     case "disconnected":
-                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
                                         })
                                         break;
                                     case "failed":
-                                        console.log("failed");
                                         remoteStream.getTracks().forEach((track) => {
                                             remoteStream.removeTrack(track);
                                             setRemoteStreams((remoteStreams) => {
@@ -333,7 +365,6 @@ const Room = (props) => {
                                         })
                                         break;
                                     case "closed":
-                                        console.log("closed");
                                         break;
                                     default:
                                         break;
@@ -393,10 +424,6 @@ const Room = (props) => {
                                         });
                                     });
                                 }
-
-                                if (data.isClosed == true) {
-                                    console.log('tat connection');
-                                }
                             });
 
                             let saveStreamID = null;
@@ -404,13 +431,10 @@ const Room = (props) => {
                                 event.streams[0].getTracks().forEach(track => {
                                     remoteStream.addTrack(track);
                                 });
-                                console.log("receive stream", event.streams[0].id);
                                 if (!saveStreamID) {
                                     saveStreamID = event.streams[0].id;
-                                    console.log("add stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => [...remoteStreams, remoteStream]);
                                 } else {
-                                    console.log("modified stream", remoteStream.id)
                                     setRemoteStreams((remoteStreams) => {
                                         let copyStreams = [...remoteStreams];
                                         copyStreams[remoteStreams.findIndex(({ id }) => id === remoteStream.id)] = remoteStream;
@@ -421,14 +445,15 @@ const Room = (props) => {
 
                             peerConnection.onconnectionstatechange = (event) => {
                                 switch (peerConnection.connectionState) {
+                                    case "connected":
+                                        console.log("connected");
+                                        break;
                                     case "disconnected":
-                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
                                         })
                                         break;
                                     case "failed":
-                                        console.log("failed");
                                         remoteStream.getTracks().forEach((track) => {
                                             remoteStream.removeTrack(track);
                                             setRemoteStreams((remoteStreams) => {
@@ -440,7 +465,6 @@ const Room = (props) => {
                                         })
                                         break;
                                     case "closed":
-                                        console.log("closed");
                                         break;
                                     default:
                                         break;
@@ -467,6 +491,8 @@ const Room = (props) => {
         })
 
     }, [roomRef]);
+
+
     useEffect(() => {
         setRoomJoined();
         return;
@@ -476,9 +502,11 @@ const Room = (props) => {
         e.preventDefault();
         if (message) {
             messagesRef.add({
-                text: message,
+                messageText: message,
                 createdAt: newTimestamp,
-                userid: user.uid,
+                userID: user.uid,
+                userEmail: user.email,
+                userName: user.displayName
             });
         }
     }
@@ -495,7 +523,7 @@ const Room = (props) => {
                             <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
-                            <RoomInfo user={user} roomid={roomRef.id} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} />
+                            <RoomInfo user={user} roomData={roomData} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} />
                         </Col>
                     </Row>
                 )

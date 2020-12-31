@@ -2,8 +2,9 @@
   display: flex;
   align-items: center;
   background: white;
-  border-top: 1px solid #a8a8a8;
   height: 50px;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 @supports (backdrop-filter: blur(20px)) {
@@ -18,8 +19,6 @@
   height: 100%;
   background: none;
   outline: none;
-  border-top: 1px solid #a8a8a8;
-  border-right: 1px solid #a8a8a8;
   width: 100%;
 }
 
@@ -27,12 +26,6 @@
   height: 100%;
   
 }
-
-.compose-input:focus {
-  border-top: 1px solid #646464;
-  border-right: 1px solid #a8a8a8;
-}
-
 
 .compose .toolbar-button {
   color: #bbbbbf;

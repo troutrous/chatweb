@@ -1,5 +1,4 @@
 import React from 'react';
-import moment from 'moment';
 import './Message.css';
 
 export default function Message(props) {
@@ -9,11 +8,12 @@ export default function Message(props) {
   return (
     <div className={[
       'message',
-      `${message.userid == user.uid ? 'mine' : ''}`
+      `${message.userID == user.uid ? 'mine' : ''}`
     ].join(' ')}>
       <div className="bubble-container">
         <div className="bubble">
-          {message.text}
+          <h6>{message.messageText}</h6>
+          <small>{message.userName}</small>
         </div>
       </div>
     </div>
