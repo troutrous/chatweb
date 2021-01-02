@@ -48,15 +48,18 @@ const Room = (props) => {
     const [localStream, setLocalStream] = useState();
     const [remoteStreams, setRemoteStreams] = useState([]);
 
-    const [query, setQuery] = useState(null);
+    const [queryForMessageData, setQueryForMessageData] = useState(null);
     const [messagesRef, setMessagesRef] = useState(null);
-    const [query1, setQuery1] = useState(null);
+    const [queryForMemberData, setQueryForMemberData] = useState(null);
     const [membersRef, setMembersRef] = useState(null);
 
     const [peerConnections, setPeerConnections] = useState([]);
 
-    const [messages] = useCollectionData(query, { idField: 'id' });
-    const [members] = useCollectionData(query1, { idField: 'id' });
+    const [connections, setConnections] = useState([]);
+    const [membersConnect, setMembersConnect] = useState([]);
+
+    const [messages] = useCollectionData(queryForMessageData, { idField: 'id' });
+    const [members] = useCollectionData(queryForMemberData, { idField: 'id' });
 
 
     const history = useHistory();
@@ -102,7 +105,7 @@ const Room = (props) => {
                         let password = prompt("Vui lòng nhập mật khẩu để vào phòng");
                         if (password === roomExists.data().roomPassword) {
                             setRoomData(roomExists.data());
-                            return navigator.mediaDevices.getUserMedia(constraints);
+                            return roomCollectionRef.doc(roomIDParam).collection('members').where('memberID', '==', app.auth().currentUser.uid).get();
                         }
                         else {
                             var answer = window.confirm("Rất tiêc! Mật khẩu của bạn chưa đúng! Bạn có muốn nhập lại mật khẩu ??");
@@ -122,8 +125,18 @@ const Room = (props) => {
                     throw new Error("No room");
                 }
             })
+            .then((members) => {
+                members.forEach((member) => {
+                    if (member.data().memberBlocked == true) {
+                        alert("Rất tiếc! Bạn không thể tham gia phòng này!");
+                        handleGotoSign();
+                        erorFlag = true;
+                        throw new Error("User was blocked");
+                    }
+                })
+                return navigator.mediaDevices.getUserMedia(constraints);
+            })
             .then((stream) => {
-                console.log("add localStream");
                 tempLocalStream = stream;
                 setLocalStream(stream);
             })
@@ -132,12 +145,12 @@ const Room = (props) => {
             })
             .finally(() => {
                 if (!erorFlag) {
-                    console.log("hahaha");
                     setUserRef(userCollectionRef.doc(app.auth().currentUser.uid));
                     setRoomRef(roomCollectionRef.doc(roomIDParam));
-                    setQuery(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
+
+                    setQueryForMessageData(roomCollectionRef.doc(roomIDParam).collection('messages').orderBy('createdAt', 'asc'));
                     setMessagesRef(roomCollectionRef.doc(roomIDParam).collection('messages'));
-                    setQuery1(roomCollectionRef.doc(roomIDParam).collection('members').orderBy('memberTimeJoin', 'asc'));
+                    setQueryForMemberData(roomCollectionRef.doc(roomIDParam).collection('members').orderBy('memberTimeJoin', 'asc'));
                     setMembersRef(roomCollectionRef.doc(roomIDParam).collection('members'));
                 }
             })
@@ -151,14 +164,15 @@ const Room = (props) => {
     }, []);
 
     const closeConnections = () => {
+        console.log(peerConnections.length);
         peerConnections.forEach(connection => {
             connection.close();
         })
     }
 
     const setOffMembers = async () => {
-        if (!roomRef) return;
-        const membersSnapshot = await roomRef.collection('members').where('memberID', '==', user.uid).get();
+        if (!roomRef || !membersRef) return;
+        const membersSnapshot = await membersRef.where('memberID', '==', user.uid).get();
         if (!membersSnapshot.empty) {
             membersSnapshot.forEach(memberSnap => {
                 roomRef.collection('members').doc(memberSnap.id).update({
@@ -179,9 +193,33 @@ const Room = (props) => {
         }
     };
 
+
     useEffect(() => {
-        console.log(roomData);
-    }, [roomData])
+        if (!members || !user) return;
+        const localMember = members.find(member => member.memberID == user.uid);
+
+        members.forEach(member => {
+            if (localMember.memberID != member.memberID &&
+                localMember.memberTimeJoin != null &&
+                member.memberTimeJoin != null &&
+                localMember.memberTimeJoin - member.memberTimeJoin < 0 &&
+                localMember.memberStatus === true &&
+                member.memberStatus === true &&
+                !membersConnect.find(mC => mC.memberID == member.memberID)
+            ) {
+                console.log("create", localMember, member);
+                setMembersConnect((membersConnect) => [...membersConnect, member]);
+                return roomRef.collection('peerConnections').doc().set(
+                    {
+                        memberOfferID: localMember.memberID,
+                        memberAnswerID: member.memberID,
+                        connectedAt: newTimestamp,
+                    }
+                );
+            }
+        })
+    }, [members])
+
 
     useEffect(() => {
         if (!roomRef) return null;
@@ -192,9 +230,7 @@ const Room = (props) => {
         let localMember;
         let unsubscribeMembers = null;
         let unsubscribeConnections = null;
-        let unsubscribeConnection = null;
-        let unsubscribeCalleeCandidates = null;
-        let unsubscribeCallerCandidates = null;
+
         membersRef.where('memberID', '==', user.uid).get()
             .then((membersSnapshotPromise) => {
                 membersSnapshot = membersSnapshotPromise;
@@ -211,13 +247,27 @@ const Room = (props) => {
                     });
                 } else {
                     localMemberRef = membersRef.doc();
-                    return localMemberRef.set({
-                        memberID: user.uid,
-                        memberTimeJoin: newTimestamp,
-                        memberStatus: true,
-                        memberEmail: user.email,
-                        memberName: user.displayName,
-                    });
+                    if (roomData.roomLead.uid == user.uid) {
+                        return localMemberRef.set({
+                            memberID: user.uid,
+                            memberTimeJoin: newTimestamp,
+                            memberStatus: true,
+                            memberEmail: user.email,
+                            memberName: user.displayName,
+                            memberBlocked: false,
+                            memberAdmin: true,
+                        });
+                    } else {
+                        return localMemberRef.set({
+                            memberID: user.uid,
+                            memberTimeJoin: newTimestamp,
+                            memberStatus: true,
+                            memberEmail: user.email,
+                            memberName: user.displayName,
+                            memberBlocked: false,
+                            memberAdmin: false,
+                        });
+                    }
                 }
             })
             .then(() => {
@@ -234,21 +284,22 @@ const Room = (props) => {
             })
             .then((localMemberRef) => {
                 localMember = localMemberRef.data();
-                unsubscribeMembers = roomRef.collection('members').onSnapshot(async (doc) => {
-                    doc.docChanges().forEach(async (change) => {
-                        const memberChange = change.doc.data();
-                        if (localMember.memberTimeJoin != null && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberStatus == true && localMember.memberID != memberChange.memberID) {
-                            console.log("create", memberChange.memberID);
-                            return roomRef.collection('peerConnections').doc().set(
-                                {
-                                    memberOfferID: localMember.memberID,
-                                    memberAnswerID: memberChange.memberID,
-                                    connectedAt: newTimestamp,
-                                }
-                            );
-                        }
-                    })
-                });
+                // unsubscribeMembers = roomRef.collection('members').onSnapshot(async (doc) => {
+                //     doc.docChanges().forEach(async (change) => {
+                //         console.log(connections);
+                //         const memberChange = change.doc.data();
+                //         if (localMember.memberTimeJoin != null && localMember.memberTimeJoin - memberChange.memberTimeJoin < 0 && memberChange.memberStatus == true && localMember.memberStatus == true && localMember.memberID != memberChange.memberID) {
+                //             console.log("create", memberChange.memberID);
+                //             return roomRef.collection('peerConnections').doc().set(
+                //                 {
+                //                     memberOfferID: localMember.memberID,
+                //                     memberAnswerID: memberChange.memberID,
+                //                     connectedAt: newTimestamp,
+                //                 }
+                //             );
+                //         }
+                //     })
+                // });
             })
             .then(() => {
                 console.log("step3");
@@ -261,7 +312,6 @@ const Room = (props) => {
                         if (connectionRef.type === 'modified' && connectionData.memberOfferID == user.uid && connectionData.offer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0 && localMember.memberTimeJoin != null) {
                             console.log("peer offer", connectionData.memberAnswerID);
                             const peerConnection = new RTCPeerConnection(configuration);
-                            setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
                             const remoteStream = new MediaStream();
 
                             if (localStream) {
@@ -347,11 +397,14 @@ const Room = (props) => {
                                 switch (peerConnection.connectionState) {
                                     case "connected":
                                         console.log("connected");
+                                        setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
                                         break;
                                     case "disconnected":
+                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
-                                        })
+                                        });
+
                                         break;
                                     case "failed":
                                         remoteStream.getTracks().forEach((track) => {
@@ -360,9 +413,14 @@ const Room = (props) => {
                                                 return remoteStreams.filter((streamItem) =>
                                                     streamItem.id != remoteStream.id
                                                 );
-                                            }
+                                            });
+                                        });
+                                        setMembersConnect((membersConnect) => {
+                                            return membersConnect.filter((mC) =>
+                                                mC.memberID != connectionData.memberAnswerID
                                             );
-                                        })
+                                        });
+                                        peerConnection.close();
                                         break;
                                     case "closed":
                                         break;
@@ -376,7 +434,7 @@ const Room = (props) => {
                         if (connectionRef.type === 'added' && connectionData.memberAnswerID == user.uid && connectionData.answer == undefined && localMember.memberTimeJoin - connectionData.connectedAt < 0) {
                             console.log("peer answer", connectionData.memberOfferID);
                             const peerConnection = new RTCPeerConnection(configuration);
-                            setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
+
                             const remoteStream = new MediaStream();
 
                             if (localStream) {
@@ -447,22 +505,30 @@ const Room = (props) => {
                                 switch (peerConnection.connectionState) {
                                     case "connected":
                                         console.log("connected");
+                                        setPeerConnections((peerConnections) => [...peerConnections, peerConnection]);
                                         break;
                                     case "disconnected":
+                                        console.log("disconnected");
                                         remoteStream.getTracks().forEach((track) => {
                                             track.stop();
-                                        })
+                                        });
                                         break;
                                     case "failed":
+                                        console.log("failed");
                                         remoteStream.getTracks().forEach((track) => {
                                             remoteStream.removeTrack(track);
                                             setRemoteStreams((remoteStreams) => {
                                                 return remoteStreams.filter((streamItem) =>
                                                     streamItem.id != remoteStream.id
                                                 );
-                                            }
+                                            });
+                                        });
+                                        setMembersConnect((membersConnect) => {
+                                            return membersConnect.filter((mC) =>
+                                                mC.memberID != connectionData.memberOfferID
                                             );
-                                        })
+                                        });
+                                        peerConnection.close();
                                         break;
                                     case "closed":
                                         break;
@@ -511,6 +577,33 @@ const Room = (props) => {
         }
     }
 
+    const handleBlockedUser = ({ member = '', type = '' }) => {
+        if (type === 'Blocked') {
+            membersRef.doc(member.id).update({
+                memberBlocked: true
+            });
+            return;
+        }
+        if (type === 'Unblocked') {
+            membersRef.doc(member.id).update({
+                memberBlocked: false
+            });
+            return;
+        }
+        if (type === 'Authorize') {
+            membersRef.doc(member.id).update({
+                memberAdmin: true
+            });
+            return;
+        }
+        if (type === 'Unauthorize') {
+            membersRef.doc(member.id).update({
+                memberAdmin: false
+            });
+            return;
+        }
+    }
+
     return (
         <div className="h-100 w-100">
             {
@@ -523,7 +616,7 @@ const Room = (props) => {
                             <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
-                            <RoomInfo user={user} roomData={roomData} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} />
+                            <RoomInfo user={user} roomData={roomData} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} handleBlockedUser={handleBlockedUser} />
                         </Col>
                     </Row>
                 )
