@@ -11,6 +11,7 @@ export default function RoomInfo(props) {
     const { setOffMembers } = props;
     const { closeConnections } = props;
     const { members } = props;
+    const {roomIDParam} = props;
     const { handleBlockedUser } = props;
     const history = useHistory();
     const handleGotoProfile = useCallback(() => history.replace('/profile'), [history]);
@@ -51,6 +52,7 @@ export default function RoomInfo(props) {
             <Alert variant='info' className='text-center'>
                 <h6>Room</h6>
                 <h6>{roomData?.roomName}</h6>
+                <h6>{roomIDParam}</h6>
             </Alert>
             <Alert variant='light' className="w-100 p-0 text-center m-0">
                 <h6>Admin</h6>

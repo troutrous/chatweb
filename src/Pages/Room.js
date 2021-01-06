@@ -247,27 +247,17 @@ const Room = (props) => {
                     });
                 } else {
                     localMemberRef = membersRef.doc();
-                    if (roomData.roomLead.uid == user.uid) {
-                        return localMemberRef.set({
-                            memberID: user.uid,
-                            memberTimeJoin: newTimestamp,
-                            memberStatus: true,
-                            memberEmail: user.email,
-                            memberName: user.displayName,
-                            memberBlocked: false,
-                            memberAdmin: true,
-                        });
-                    } else {
-                        return localMemberRef.set({
-                            memberID: user.uid,
-                            memberTimeJoin: newTimestamp,
-                            memberStatus: true,
-                            memberEmail: user.email,
-                            memberName: user.displayName,
-                            memberBlocked: false,
-                            memberAdmin: false,
-                        });
-                    }
+
+                    return localMemberRef.set({
+                        memberID: user.uid,
+                        memberTimeJoin: newTimestamp,
+                        memberStatus: true,
+                        memberEmail: user.email,
+                        memberName: user.displayName,
+                        memberBlocked: false,
+                        memberAdmin: false,
+                    });
+
                 }
             })
             .then(() => {
@@ -616,7 +606,7 @@ const Room = (props) => {
                             <VideoCall localStream={localStream} remoteStreams={remoteStreams} />
                         </Col>
                         <Col className="col-2 h-100 w-100 p-0">
-                            <RoomInfo user={user} roomData={roomData} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} handleBlockedUser={handleBlockedUser} />
+                            <RoomInfo user={user} roomIDParam={roomIDParam} roomData={roomData} members={members} setOffMembers={setOffMembers} closeConnections={closeConnections} handleBlockedUser={handleBlockedUser} />
                         </Col>
                     </Row>
                 )

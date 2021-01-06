@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Button, Container, Col, Row, Image, Form } from 'react-bootstrap';
-import { app, database, emailProvider } from '../firebase';
+import { app, database, emailProvider, newTimestamp } from '../firebase';
 import { getCookie, setCookie } from '../Commons/Cookie';
 import { useHistory } from 'react-router-dom';
 
@@ -108,6 +108,15 @@ const Profile = (props) => {
                 },
                 roomCreatedAt: new Date(),
             });
+            roomCollectionRef.doc(newRoomRef.id).collection("members").add({
+                memberID: user.uid,
+                memberTimeJoin: newTimestamp,
+                memberStatus: true,
+                memberEmail: user.email,
+                memberName: user.displayName,
+                memberBlocked: false,
+                memberAdmin: true,
+            })
             setRoomNameCreate('');
             setRoomPasswordCreate('');
             handleGotoRoom(newRoomRef.id);

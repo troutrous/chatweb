@@ -16,7 +16,7 @@ const Sign = (props) => {
 
     const [nameSignup, setNameSignup] = useState('');
     const [phoneSignup, setPhoneSignup] = useState('');
-    const [newPass, setNewPass] = useState('');
+    const [emailForget, setEmailForget] = useState('');
     const [reNewPass, setReNewPass] = useState('');
     const [otp, setOtp] = useState('');
     const [errorReset, setErrorReset] = useState();
@@ -52,8 +52,8 @@ const Sign = (props) => {
     const handleOnPhoneSignupChange = (event) => {
         setPhoneSignup(event.target.value);
     }
-    const changeNewPass = (event) => {
-        setNewPass(event.target.value);
+    const changeEmailForget = (event) => {
+        setEmailForget(event.target.value);
     }
     const changeReNewPass = (event) => {
         setReNewPass(event.target.value);
@@ -94,25 +94,12 @@ const Sign = (props) => {
     }
     const handleReset = async (event) => {
         event.preventDefault();
-        console.log(newPass);
-        if(newPass != reNewPass){
-            return setErrorReset("Confirm Password is incorrect!");
+        try {
+            await app.auth().sendPasswordResetEmail(emailForget);
+            alert("Một email đã được gửi tới bạn! Hãy kiểm tra hộp thư ngay nhé!");
+        } catch (error) {
+            alert(error.message);
         }
-        // try {
-        //     await app.auth().createUserWithEmailAndPassword(emailSignup, passwordSignup);
-        //     const currentUser = app.auth().currentUser;
-        //     await currentUser.updateProfile({
-        //         displayName: nameSignup,
-        //         phoneNumber: phoneSignup
-        //     })
-        //     const token = await getCurrentToken();
-        //     if (token) {
-        //         setCookie('userToken', token);
-        //         handleGotoProfile();
-        //     }
-        // } catch (error) {
-        //     console.log(error);
-        // }
     }
 
     const getCurrentToken = async () => {
@@ -241,8 +228,8 @@ const Sign = (props) => {
                                         </Alert>
                                     </Form.Group>
                                 </Form>
-                            ) || ([]) }
-                            {
+                            ) || ([])}
+                        {
                             signType == 'Signup' && (
                                 <Form>
                                     <Form.Row className="w-100">
@@ -274,21 +261,21 @@ const Sign = (props) => {
                                 <Form>
                                     <Form.Row className="w-100">
                                         <Form.Group as={Col} controlId="formGridEmail" className="pl-0">
-                                            <Form.Label>New Password</Form.Label>
-                                            <Form.Control type="email" placeholder="New password" value={newPass} onChange={changeNewPass} />
+                                            <Form.Label>Email</Form.Label>
+                                            <Form.Control type="email" placeholder="Enter email" value={emailForget} onChange={changeEmailForget} />
                                         </Form.Group>
 
-                                        <Form.Group as={Col} controlId="formGridPassword" className="pr-0">
+                                        {/* <Form.Group as={Col} controlId="formGridPassword" className="pr-0">
                                             <Form.Label>Confirm Password</Form.Label>
                                             <Form.Control type="password" placeholder="Confirm password" value={reNewPass} onChange={changeReNewPass} />
-                                        </Form.Group>
+                                        </Form.Group> */}
                                     </Form.Row>
-                                    <Form.Row className="w-100">
+                                    {/* <Form.Row className="w-100">
                                         <Form.Group as={Col} controlId="formGridName1" className="px-0">
                                             <Form.Label>OTP</Form.Label>
                                             <Form.Control placeholder="We had send OTP to your mail" type="text" value={otp} onChange={changeOtp    } />
                                         </Form.Group>
-                                    </Form.Row>
+                                    </Form.Row> */}
                                     <Form.Row className="d-flex justify-content-between w-100">
                                         <Button type="button" variant="danger" onClick={handleChangeSignType}>Back</Button>
                                         <Button variant="info" type="submit" onClick={handleReset}>Reset</Button>
@@ -298,8 +285,8 @@ const Sign = (props) => {
                                             <Form.Label>{errorReset}</Form.Label>
                                         </Form.Group>
                                     </Form.Row>
-                                   
-                                    
+
+
                                 </Form>
                             ) || ([])
                         }
