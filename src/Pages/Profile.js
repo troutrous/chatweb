@@ -82,12 +82,15 @@ const Profile = (props) => {
             let memberArray = [];
             const roomInfo = await roomCollectionRef.doc(roomJoinedSnap.id).get();
             const memberInRoomInfo = await roomCollectionRef.doc(roomJoinedSnap.id).collection('members').get();
-            memberInRoomInfo.forEach(async member => {
-                memberArray.push(member.data());
-            })
             if (roomInfo.exists) {
+                memberInRoomInfo.forEach(async member => {
+                    memberArray.push(member.data());
+                })
                 arrayTemplate.push({ id: roomJoinedSnap.id, ...roomInfo.data(), memberArray });
-                setRoomJoined(arrayTemplate);
+                if (arrayTemplate.length == roomJoinedSnapshot.size) {
+                    setRoomJoined(arrayTemplate);
+                }
+
             }
         });
     };
@@ -301,13 +304,13 @@ const Profile = (props) => {
                                 <Form onSubmit={handleCreateRoom}>
                                     <label htmlFor="formCreateNameRoom" className="h5 text-info">Tạo phòng mới</label>
                                     <Form.Group controlId="formCreateNameRoom" className="mt-2">
-                                        <Form.Control onSubmit={handleCreateRoom} type="name" placeholder="Tên phòng" value={roomNameCreate} onChange={(e) => setRoomNameCreate(e.target.value)} />
+                                        <Form.Control  type="name" placeholder="Tên phòng" value={roomNameCreate} onChange={(e) => setRoomNameCreate(e.target.value)} />
                                     </Form.Group>
                                     <Form.Group controlId="formCreatePasswordRoom" className="mt-2">
-                                        <Form.Control type="password" placeholder="Mật khẩu" value={roomPasswordCreate} onChange={(e) => setRoomPasswordCreate(e.target.value)} />
+                                        <Form.Control onSubmit={handleCreateRoom} type="password" placeholder="Mật khẩu" value={roomPasswordCreate} onChange={(e) => setRoomPasswordCreate(e.target.value)} />
                                     </Form.Group>
                                     <Form.Group className="d-flex justify-content-center">
-                                        <Button variant="info" type="button" className="btn w-100 mt-2" onClick={handleCreateRoom}>
+                                        <Button variant="info" type="submit" className="btn w-100 mt-2" onClick={handleCreateRoom}>
                                             <span className="mr-2">Create Room</span>
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-file-plus" viewBox="0 0 16 16">
                                                 <path d="M8.5 6a.5.5 0 0 0-1 0v1.5H6a.5.5 0 0 0 0 1h1.5V10a.5.5 0 0 0 1 0V8.5H10a.5.5 0 0 0 0-1H8.5V6z" />
@@ -335,8 +338,8 @@ const Profile = (props) => {
                                 </Form>
                             </Alert>
                         </Col>
-                        <Col className="col-8 p-0 bg-light">
-                            <div className="list-group">
+                        <Col className="col-8 p-0 bg-light overflow-auto h-100 pl-1">
+                            <div className="list-group overflow-auto">
                                 {
                                     roomJoined && roomJoined.map((room, index) => (
                                         <RoomListItem room={room} key={index} handleJoinRoom={handleGotoRoom} />

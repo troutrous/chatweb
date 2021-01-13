@@ -21,7 +21,7 @@ export default function RoomInfo(props) {
     useEffect(() => {
         if (members && user) {
             const ms = members.find(member => member.memberID == user.uid);
-            if (ms.memberBlocked == true) {
+            if (ms?.memberBlocked == true) {
                 handleBackToProfile();
             }
             else {

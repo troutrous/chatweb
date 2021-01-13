@@ -214,11 +214,11 @@ const Sign = (props) => {
                                     </Form.Group>
                                     <Alert variant='info' className="d-flex justify-content-between">
                                         Don't have an account?
-                            <Button variant="info" type="button" onClick={() => handleChangeSignType()}>Sign up</Button>
+                                    <Button variant="info" type="button" onClick={() => handleChangeSignType()}>Sign up</Button>
                                     </Alert>
                                     <Alert variant='info' className="d-flex justify-content-between">
                                         Forgot Password?
-                            <Button variant="info" type="button" onClick={() => handleResetPassword()}>Reset Password</Button>
+                                    <Button variant="info" type="button" onClick={() => handleResetPassword()}>Reset Password</Button>
                                     </Alert>
                                     <Form.Group className="d-flex justify-content-center">
                                         <Alert variant='info w-100 d-flex justify-content-center'>

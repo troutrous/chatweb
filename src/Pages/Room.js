@@ -198,6 +198,8 @@ const Room = (props) => {
         if (!members || !user) return;
         const localMember = members.find(member => member.memberID == user.uid);
 
+        if(!localMember) return;
+
         members.forEach(member => {
             if (localMember.memberID != member.memberID &&
                 localMember.memberTimeJoin != null &&
